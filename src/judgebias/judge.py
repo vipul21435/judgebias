@@ -75,7 +75,7 @@ def pair_from_dict(row: dict[str, Any]) -> Pair:
 def load_pairs(path: str) -> list[Pair]:
     from .data import iter_jsonl
 
-    return [pair_from_dict(row) for row in iter_jsonl(path)]
+    return [pair_from_dict(row) for _, row in iter_jsonl(path)]
 
 
 UNPARSED = "unparsed"
