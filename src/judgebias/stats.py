@@ -94,10 +94,10 @@ def logistic_fit(x: np.ndarray, y: np.ndarray, *, l2: float = 1e-4) -> tuple[flo
     """Fit P(y=1) = sigmoid(a + b*x) by penalised maximum likelihood.
 
     A small L2 penalty keeps the fit finite when the classes are separable.
-    Returns ``(intercept, slope)``. When every ``y`` is the same the slope is
-    not identified and comes back as nan (the intercept as +inf or -inf), so
-    that a bootstrap drops such a resample instead of counting it as a slope
-    of zero.
+    Returns ``(intercept, slope)``. When every ``y`` is the same, or every
+    ``x`` is, the slope is not identified and comes back as nan (with every
+    ``y`` the same, the intercept is +inf or -inf), so that a bootstrap drops
+    such a resample instead of counting it as a slope of zero.
     """
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
@@ -105,6 +105,8 @@ def logistic_fit(x: np.ndarray, y: np.ndarray, *, l2: float = 1e-4) -> tuple[flo
         return float("nan"), float("nan")
     if np.all(y == y[0]):
         return (float("inf") if y[0] == 1 else float("-inf")), float("nan")
+    if np.ptp(x) == 0:
+        return float("nan"), float("nan")
     w = logistic_fit_multi(x[:, None], y, l2=l2)
     return float(w[0]), float(w[1])
 
@@ -121,6 +123,8 @@ def logistic_fit_multi(x: np.ndarray, y: np.ndarray, *, l2: float = 1e-4) -> np.
     y = np.asarray(y, dtype=float)
     if x.ndim != 2 or x.shape[0] != y.shape[0]:
         raise ValueError("x must be 2-D with one row per element of y")
+    if not np.all(np.isfinite(x)):
+        raise ValueError("x must be finite")
     design = np.hstack([np.ones((x.shape[0], 1)), x])
     penalty = np.full(design.shape[1], l2)
     penalty[0] = 0.0

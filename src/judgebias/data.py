@@ -46,6 +46,10 @@ class Judgment:
             raise ValueError(f"order must be one of {ORDERS}, got {self.order!r}")
         if self.human is not None and self.human not in VERDICTS:
             raise ValueError(f"human must be one of {VERDICTS}, got {self.human!r}")
+        for name in ("len_a", "len_b"):
+            value = getattr(self, name)
+            if value is not None and (isinstance(value, bool) or value < 0):
+                raise ValueError(f"{name} must be a non-negative count, got {value!r}")
 
     @property
     def first_shown(self) -> str:

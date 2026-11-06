@@ -184,7 +184,7 @@ def _adjusted_rows(judgments: Sequence[Judgment]) -> tuple[np.ndarray, np.ndarra
 
 def _adjusted_slope(groups: Sequence[Sequence[Judgment]]) -> float:
     x, y = _adjusted_rows(_flat(groups))
-    if x.shape[0] < 3 or np.all(y == y[0]):
+    if x.shape[0] < 3 or np.all(y == y[0]) or np.ptp(x[:, 0]) == 0:
         return float("nan")
     return float(logistic_fit_multi(x, y)[1])
 
@@ -210,6 +210,8 @@ def length_bias(
     that went to the longer answer. ``slope`` is the coefficient of
     ``log((len_a+1)/(len_b+1))`` in a logistic fit of P(A wins); 0 means
     length does not move the verdict, positive means longer answers win more.
+    When every pair has the same length ratio the slope is not identified and
+    is nan (shown as n/a), not 0.
     Both come with a bootstrap interval over prompts. Copied rows count once
     (see :func:`distinct`).
 
