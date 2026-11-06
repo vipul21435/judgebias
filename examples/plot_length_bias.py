@@ -6,7 +6,7 @@ Wilson interval, and the curve is the logistic fit that ``judgebias audit``
 reports. Needs matplotlib (not a dependency of judgebias):
 
     uv run --with matplotlib python examples/plot_length_bias.py \\
-        GPT4.jsonl HUMANS.jsonl docs/length_bias.png --labels "GPT-4 judge" "Human experts"
+        GPT4.jsonl HUMANS.jsonl docs/length_bias.png --labels "GPT-4 judge" "Human judges"
 """
 
 from __future__ import annotations

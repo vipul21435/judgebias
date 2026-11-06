@@ -100,7 +100,7 @@ Every interval resamples prompts (`pair_id`), not rows, so both presentation ord
 
 Data: the MT-Bench human judgments, [lmsys/mt_bench_human_judgments](https://huggingface.co/datasets/lmsys/mt_bench_human_judgments) on Hugging Face, released with the paper [Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685) (Zheng et al., NeurIPS 2023 Datasets and Benchmarks). The dataset card lists the licence as CC BY 4.0 (checked on the dataset page above). It has two splits: `human`, 3,355 verdicts by human judges on pairs of answers from six models to the 80 MT-Bench questions, and `gpt4_pair`, 2,400 verdicts by a GPT-4 judge on every pair (80 questions, 15 model pairs, 2 turns). GPT-4 saw each pair in both orders; a verdict of `tie (inconsistent)` means the two orders disagreed. No data from the set is stored in this repository; `judgebias mtbench` downloads the two parquet files (1.4 MB) into the folder you name.
 
-Commands (each audit takes about 25 seconds with the default 1000 bootstrap draws):
+Commands (with the default 1000 bootstrap draws an audit took 10 to 32 seconds here, depending on the file):
 
 ```
 judgebias mtbench --data-dir mtb --humans humans.jsonl --judge gpt4.jsonl --human-pairs human_pairs.jsonl
@@ -113,7 +113,7 @@ judgebias audit t1_gpt4.jsonl                    # and the same for t1_human_pai
 
 `gpt4.jsonl` holds one row per human verdict, carrying GPT-4's verdict on the same pair; `human_pairs.jsonl` holds one row for every two different human judges who voted on the same pair, one as `verdict` and the other as `human`, which gives the human-human baseline on the same footing.
 
-GPT-4 judge against the human labels (all turns, all human judges; intervals over 1,814 pairs):
+GPT-4 judge against the human labels (all turns, all human judges; GPT-4 intervals resample 1,814 pairs, human-human intervals 960):
 
 | Measure | GPT-4 | One human against another |
 |---|---|---|
@@ -128,9 +128,9 @@ GPT-4 judge against the human labels (all turns, all human judges; intervals ove
 
 Over all 2,400 GPT-4 verdicts, 380 (0.158) are order-inconsistent, as the `mtbench` command prints. Self-preference: on pairs where exactly one answer comes from a `gpt` model (GPT-4 or GPT-3.5), the GPT-4 judge picked that answer 0.865 [0.835, 0.892] of the time and the human labels on the same rows 0.808 [0.785, 0.831]; the excess is +0.057 [+0.025, +0.088]. The family rule puts GPT-3.5 in the judge's family, so this measures preference for the family, not for GPT-4's own answers alone.
 
-![Share of decided verdicts for answer A against the log length ratio, GPT-4 judge and human experts, with logistic fits](docs/length_bias.png)
+![Share of decided verdicts for answer A against the log length ratio, GPT-4 judge and human judges, with logistic fits](docs/length_bias.png)
 
-`docs/length_bias.png`, made with `uv run --with matplotlib python examples/plot_length_bias.py gpt4.jsonl humans.jsonl docs/length_bias.png --labels "GPT-4 judge" "Human experts"`: decided verdicts in eight equal-count bins of the log length ratio, with 95 % Wilson intervals and the fitted logistic curves. Both GPT-4 (slope 0.93, 1,364 decided pairs) and the human judges (slope 0.70, 2,575 decided verdicts) favour the longer answer.
+`docs/length_bias.png`, made with `uv run --with matplotlib python examples/plot_length_bias.py gpt4.jsonl humans.jsonl docs/length_bias.png --labels "GPT-4 judge" "Human judges"`: decided verdicts in eight equal-count bins of the log length ratio, with 95 % Wilson intervals and the fitted logistic curves. Both GPT-4 (slope 0.93, 1,364 decided pairs) and the 65 human judges, expert and author_N alike (slope 0.70, 2,575 decided verdicts), favour the longer answer.
 
 Check against the paper. Restricted to first-turn votes by the judges named `expert_N` (the second command above), the row counts and agreement figures match Table 5 of the paper (first turn, G4-Pair against Human, and Human against Human) to the rounding the paper prints:
 
