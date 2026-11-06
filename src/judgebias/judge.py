@@ -101,7 +101,7 @@ def parse_verdict(text: str) -> str:
 
 def urllib_transport(
     url: str, headers: dict[str, str], body: bytes, timeout: float
-) -> dict[str, Any]:
+) -> dict[str, Any]:  # pragma: no cover - the one place that opens a connection
     """POST ``body`` to ``url`` and return the JSON reply."""
     req = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
@@ -118,7 +118,8 @@ class HttpJudge:
 
     ``base_url`` is the API root (``http://localhost:8000/v1``); the request
     goes to ``{base_url}/chat/completions``. ``api_key`` is sent as a bearer
-    token when given. ``transport`` can be replaced to test without a server.
+    token when given. ``transport`` defaults to ``urllib_transport`` and can
+    be replaced to test without a server.
     """
 
     base_url: str
@@ -129,7 +130,7 @@ class HttpJudge:
     temperature: float = 0.0
     max_tokens: int = 8
     timeout: float = 60.0
-    transport: Transport = urllib_transport
+    transport: Transport | None = None
     calls: int = 0
 
     def request_body(self, prompt: str, first: str, second: str) -> dict[str, Any]:
@@ -150,7 +151,8 @@ class HttpJudge:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         body = json.dumps(self.request_body(prompt, first, second)).encode("utf-8")
-        reply = self.transport(url, headers, body, self.timeout)
+        transport = self.transport or urllib_transport
+        reply = transport(url, headers, body, self.timeout)
         self.calls += 1
         try:
             text = reply["choices"][0]["message"]["content"]
