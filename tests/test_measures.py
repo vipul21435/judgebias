@@ -226,7 +226,34 @@ def test_logistic_fit_recovers_parameters():
 def test_logistic_fit_degenerate():
     assert logistic_fit(np.array([]), np.array([])) == (pytest.approx(math.nan, nan_ok=True),) * 2
     a, b = logistic_fit(np.array([1.0, 2.0]), np.array([1.0, 1.0]))
-    assert a == math.inf and b == 0.0
+    assert a == math.inf and math.isnan(b)
+    a, b = logistic_fit(np.array([1.0, 2.0]), np.array([0.0, 0.0]))
+    assert a == -math.inf and math.isnan(b)
+
+
+def test_one_class_resamples_are_dropped_from_the_slope_interval():
+    # 3 prompts: the bootstrap often draws resamples with a single verdict class;
+    # those used to count as slope 0 and are now left out
+    js = [
+        j("p0", "A", len_a=300, len_b=100),
+        j("p1", "B", len_a=100, len_b=300),
+        j("p2", "A", len_a=200, len_b=150),
+    ]
+    s = length_bias(js, reps=200)["slope"]
+    assert s["value"] > 0 and s["low"] > 0
+
+
+def test_logistic_fit_warns_when_the_optimiser_stops_early(monkeypatch):
+    from scipy.optimize import OptimizeResult
+
+    from judgebias import stats
+
+    def stuck(fun, x0, **kw):
+        return OptimizeResult(x=x0, success=False, message="ABNORMAL")
+
+    monkeypatch.setattr(stats, "minimize", stuck)
+    with pytest.warns(RuntimeWarning, match="did not converge: ABNORMAL"):
+        stats.logistic_fit(np.array([0.0, 1.0, 2.0]), np.array([0.0, 1.0, 1.0]))
 
 
 # --- self-preference -------------------------------------------------------

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -93,14 +94,17 @@ def logistic_fit(x: np.ndarray, y: np.ndarray, *, l2: float = 1e-4) -> tuple[flo
     """Fit P(y=1) = sigmoid(a + b*x) by penalised maximum likelihood.
 
     A small L2 penalty keeps the fit finite when the classes are separable.
-    Returns ``(intercept, slope)``.
+    Returns ``(intercept, slope)``. When every ``y`` is the same the slope is
+    not identified and comes back as nan (the intercept as +inf or -inf), so
+    that a bootstrap drops such a resample instead of counting it as a slope
+    of zero.
     """
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     if x.size == 0:
         return float("nan"), float("nan")
     if np.all(y == y[0]):
-        return (float("inf") if y[0] == 1 else float("-inf")), 0.0
+        return (float("inf") if y[0] == 1 else float("-inf")), float("nan")
     w = logistic_fit_multi(x[:, None], y, l2=l2)
     return float(w[0]), float(w[1])
 
@@ -110,7 +114,8 @@ def logistic_fit_multi(x: np.ndarray, y: np.ndarray, *, l2: float = 1e-4) -> np.
 
     ``x`` has one row per observation and one column per covariate. The L2
     penalty applies to the covariate weights, not the intercept. Returns the
-    weights with the intercept first.
+    weights with the intercept first, and warns (``RuntimeWarning``) if the
+    optimiser reports that it did not converge.
     """
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
@@ -131,4 +136,7 @@ def logistic_fit_multi(x: np.ndarray, y: np.ndarray, *, l2: float = 1e-4) -> np.
         return design.T @ r + penalty * w
 
     res = minimize(nll, np.zeros(design.shape[1]), jac=grad, method="L-BFGS-B")
+    if not res.success:
+        warnings.warn(f"logistic fit did not converge: {res.message}", RuntimeWarning,
+                      stacklevel=2)
     return np.asarray(res.x, dtype=float)
