@@ -61,7 +61,25 @@ class LongerTransport:
         # the article "a" is not a verdict
         ("As a judge, I pick 2", "second"),
         ("A is worse; 2 wins", "second"),
-        ("I think A wins", "unparsed"),
+        # a capital letter followed by a claim is a verdict
+        ("I think A wins", "first"),
+        ("A is better", "first"),
+        ("B is the better response.", "second"),
+        # labelled one-line formats and stated picks
+        ("Answer: B", "second"),
+        ("Verdict: A", "first"),
+        ("Final verdict: tie", "tie"),
+        ("Winner - 2", "second"),
+        ("I choose B.", "second"),
+        ("I pick response 1 here", "first"),
+        # the article after a verb is not a pick
+        ("I prefer a shorter reply", "unparsed"),
+        # digits in a longer reply, scores and negations are not read
+        ("2/10", "unparsed"),
+        ("I would not pick 1", "unparsed"),
+        ("Both are fine, about 1 or 2 points apart", "unparsed"),
+        ("I'd give it 1.5 points", "unparsed"),
+        ("1 overall", "first"),
         # both slots or neither named: unparsed, not a tie
         ("Response 1 is worse than Response 2", "unparsed"),
         ("[[A]] or [[B]]", "unparsed"),
@@ -263,3 +281,15 @@ def test_missing_pair_fields_name_the_line(tmp_path):
     pairs.write_text("7\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"pairs.jsonl:1: expected a JSON object"):
         load_pairs(str(pairs))
+
+
+def test_parse_verdict_never_raises_on_random_replies():
+    import random
+
+    tokens = ["A", "B", "a", "b", "C", "1", "2", "10", "/", "2/10", "1.5", "[[", "]]", ":",
+              "Answer", "verdict", "Response", "first", "second", "tie", "not", "pick",
+              "is better", "wins", "**", "\n", " ", ".", "é", "{", "}"]
+    rng = random.Random(0)
+    for _ in range(2000):
+        text = "".join(rng.choice(tokens) + rng.choice(["", " "]) for _ in range(rng.randint(0, 9)))
+        assert parse_verdict(text) in ("first", "second", "tie", "unparsed")

@@ -101,28 +101,65 @@ _ALONE = {
     "tie": "tie", "c": "tie",
 }
 _BRACKET_RE = re.compile(r"\[\[\s*(a|b|c|1|2|tie)\s*\]\]", re.IGNORECASE)
+# Letters are only read in upper case outside a bracket marker: a lower-case
+# "a" after a verb or a colon is usually the article.
+_VALUE = r"([ABC]|[12](?![\d/]|\.\d)|(?i:tie|first|second))\b"
+_LABELLED_RE = re.compile(
+    r"(?i:\b(?:final\s+)?(?:answer|verdict|winner|choice|decision))\s*[:=-]\s*[*_`]*\s*"
+    + _VALUE
+)
 _NAMED_RE = re.compile(
     r"\b(?:response|answer|assistant|output|option|candidate)\s*#?\s*(a|b|1|2)\b",
     re.IGNORECASE,
 )
-_WORD_RE = re.compile(r"\b(1|2|first|second|tie)\b", re.IGNORECASE)
+_PICK_RE = re.compile(
+    r"(?i:\b(?:choose|chose|pick|picked|prefer|select|selected)\s+"
+    r"(?:response\s+|answer\s+|option\s+)?)([AB]|[12](?![\d/]|\.\d))\b"
+)
+_CLAIM_RE = re.compile(
+    r"\b([AB]|[12])\s+(?i:wins|is\s+better|is\s+preferred|is\s+the\s+better)\b"
+)
+_NEGATION_RE = re.compile(r"(?:\bnot|n't|\bnever)\s+$", re.IGNORECASE)
+_WORD_RE = re.compile(r"\b(first|second|tie)\b", re.IGNORECASE)
+_DIGIT_RE = re.compile(r"(?<![\d/.])\b([12])\b(?![\d/]|\.\d)")
+_SHORT_REPLY = 3
+
+
+def _picks(text: str) -> set[str]:
+    """Stated picks (``I choose B``), skipping negated ones (``would not pick 1``)."""
+    out = set()
+    for m in _PICK_RE.finditer(text):
+        verb_start = m.start()
+        if not _NEGATION_RE.search(text[max(0, verb_start - 12):verb_start]):
+            out.add(_ALONE[m.group(1).lower()])
+    return out
 
 
 def parse_verdict(text: str) -> str:
     """Map a judge reply to ``first``, ``second``, ``tie`` or ``unparsed``.
 
-    A reply that is nothing but a verdict (``1``, ``2``, ``A``, ``B``,
-    ``first``, ``second``, ``tie``, optionally in brackets or with trailing
-    punctuation) is read directly. In a longer reply the letters ``A`` and
-    ``B`` are only read inside a marker such as ``[[A]]`` or ``Response B``,
-    since the bare letter is also the English article; the digits ``1`` and
-    ``2`` and the words ``first``, ``second`` and ``tie`` are read anywhere.
-    ``[[...]]`` markers, the format the MT-Bench judge prompt asks for
-    (``[[C]]`` is a tie there, and so is a bare ``C``), take precedence when
-    present. If the reply names exactly one verdict it is
-    that verdict; if it names none, or more than one (``Response 1 is worse
-    than Response 2``), it is ``unparsed`` rather than a guess, so that a
-    chatty judge does not show up as a bias toward either slot.
+    The reply is read in this order, and the first rule that finds anything
+    decides:
+
+    1. A reply that is nothing but a verdict (``1``, ``2``, ``A``, ``B``,
+       ``first``, ``second``, ``tie``, optionally in brackets, after
+       ``Response`` or with trailing punctuation).
+    2. ``[[A]]`` / ``[[B]]`` / ``[[C]]`` markers, the format the MT-Bench judge
+       prompt asks for (``[[C]]`` is a tie there, and so is a bare ``C``).
+    3. A labelled verdict: ``Answer: B``, ``Verdict: 1``, ``Winner - tie``.
+    4. Everything else at once: named slots (``Response B``), stated picks
+       (``I choose B``, not when negated as in ``would not pick 1``), claims
+       (``A is better``, ``2 wins``), the words ``first``, ``second`` and
+       ``tie``, and, in a reply of at most three words, a bare ``1`` or ``2``
+       that is not part of a score such as ``2/10`` or ``1.5``.
+
+    Outside a marker or a whole-reply verdict, ``A`` and ``B`` are only read
+    in upper case, since the lower-case letter is also the article. If a rule
+    finds exactly one verdict it is that verdict; if it finds more than one
+    (``Response 1 is worse than Response 2``), or no rule finds any, the reply
+    is ``unparsed`` rather than a guess, so that a chatty judge does not show
+    up as a bias toward either slot. Negation is understood only in the
+    stated-pick form.
     """
     bare = text.strip().strip("[]()*_`'\".,:;!? \t\n").lower()
     for prefix in ("response ", "answer ", "assistant ", "option "):
@@ -130,12 +167,16 @@ def parse_verdict(text: str) -> str:
             bare = bare[len(prefix):].strip()
     if bare in _ALONE:
         return _ALONE[bare]
-    brackets = {_ALONE[m.lower()] for m in _BRACKET_RE.findall(text)}
-    if brackets:
-        return brackets.pop() if len(brackets) == 1 else UNPARSED
-    named = {_ALONE[m.lower()] for m in _NAMED_RE.findall(text)}
-    words = {_ALONE[m.lower()] for m in _WORD_RE.findall(text)}
-    found = named | words
+    for rule in (_BRACKET_RE, _LABELLED_RE):
+        found = {_ALONE[m.lower()] for m in rule.findall(text)}
+        if found:
+            return found.pop() if len(found) == 1 else UNPARSED
+    found = {_ALONE[m.lower()] for m in _NAMED_RE.findall(text)}
+    found |= _picks(text)
+    found |= {_ALONE[m.lower()] for m in _CLAIM_RE.findall(text)}
+    found |= {_ALONE[m.lower()] for m in _WORD_RE.findall(text)}
+    if len(text.split()) <= _SHORT_REPLY:
+        found |= {_ALONE[m] for m in _DIGIT_RE.findall(text)}
     return found.pop() if len(found) == 1 else UNPARSED
 
 
