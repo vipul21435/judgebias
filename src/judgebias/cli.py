@@ -120,6 +120,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="write GPT-4 judgments paired with each human label here")
     m.add_argument("--turn", type=int, choices=(1, 2), default=None,
                    help="keep only verdicts on this turn (default: both turns)")
+    m.add_argument("--human-prefix", default=None,
+                   help="keep only human judges whose id starts with this, e.g. expert "
+                        "(the split also holds votes by judges named author_N)")
     m.add_argument("--human-pairs", default=None,
                    help="write human-against-human rows (an agreement baseline) here")
     m.add_argument("--inconsistent", choices=("tie", "drop"), default="tie",
@@ -168,6 +171,8 @@ def _cmd_mtbench(args: argparse.Namespace) -> int:
     if args.turn is not None:
         judge_rows = [r for r in judge_rows if int(r["turn"]) == args.turn]
         human_rows = [r for r in human_rows if int(r["turn"]) == args.turn]
+    if args.human_prefix is not None:
+        human_rows = [r for r in human_rows if str(r["judge"]).startswith(args.human_prefix)]
     counts = mtbench.summary(judge_rows)
     print(
         f"human rows {len(human_rows)}; judge rows {counts['rows']}: "

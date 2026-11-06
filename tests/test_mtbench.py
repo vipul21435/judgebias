@@ -212,3 +212,8 @@ def test_cli_mtbench_turn_filter(tmp_path, capsys, monkeypatch):
     assert main(["mtbench", "--data-dir", str(tmp_path), "--judge", str(judge), "--turn", "2"]) == 0
     assert "human rows 1; judge rows 1" in capsys.readouterr().out
     assert [x.extra["turn"] for x in load_jsonl(judge)] == [2]
+    data["human"].append(row(1, "x-model", "y-model", "model_b", "author_0", turn=1))
+    argv = ["mtbench", "--data-dir", str(tmp_path), "--judge", str(judge)]
+    assert main(argv + ["--human-prefix", "expert"]) == 0
+    assert "human rows 2; judge rows 2" in capsys.readouterr().out
+    assert {x.extra["human_judge"] for x in load_jsonl(judge)} == {"expert_0"}
