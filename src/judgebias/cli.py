@@ -1,4 +1,4 @@
-"""Command line entry point: audit, simulate, run and mtbench."""
+"""Command line entry point: audit, simulate, run, mtbench and alpaca."""
 
 from __future__ import annotations
 
@@ -212,6 +212,22 @@ def build_parser() -> argparse.ArgumentParser:
                    help="write human-against-human rows (an agreement baseline) here")
     m.add_argument("--inconsistent", choices=("tie", "drop"), default="tie",
                    help="order-inconsistent GPT-4 verdicts: keep as tie or drop (default tie)")
+
+    al = sub.add_parser("alpaca", help="convert the AlpacaFarm and AlpacaEval preference files")
+    al.add_argument("--data-dir", required=True,
+                    help="folder for the downloaded JSON files (fetched once, reused after)")
+    al.add_argument("--farm-judge", default=None, metavar="PATH",
+                    help="write GPT-4 verdicts with the AlpacaFarm human labels here")
+    al.add_argument("--cross-judge", default=None, metavar="PATH",
+                    help="write GPT-4 verdicts against each cross-annotator here")
+    al.add_argument("--human-pairs", default=None, metavar="PATH",
+                    help="write cross-annotator against cross-annotator rows here")
+    al.add_argument("--eval-judges", default=None, metavar="PATH",
+                    help="write the AlpacaEval GPT-4 and Claude verdicts here")
+    al.add_argument("--eval-claude-vs-gpt4", default=None, metavar="PATH",
+                    help="write Claude verdicts with the GPT-4 verdict as the label here")
+    al.add_argument("--eval-gpt4-vs-claude", default=None, metavar="PATH",
+                    help="write GPT-4 verdicts with the Claude verdict as the label here")
     return parser
 
 
@@ -332,6 +348,53 @@ def _cmd_mtbench(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_alpaca(args: argparse.Namespace) -> int:
+    from . import alpaca
+
+    eval_cross = args.eval_claude_vs_gpt4 or args.eval_gpt4_vs_claude
+    want = {
+        "farm_human": bool(args.farm_judge),
+        "farm_gpt4": bool(args.farm_judge or args.cross_judge),
+        "farm_cross": bool(args.cross_judge or args.human_pairs),
+        "eval_gpt4": bool(args.eval_judges or eval_cross),
+        "eval_claude": bool(args.eval_judges or eval_cross),
+    }
+    names = [n for n, on in want.items() if on]
+    if not names:
+        print("judgebias: name at least one output file", file=sys.stderr)
+        return 2
+    try:
+        paths = alpaca.download(args.data_dir, names)
+        data = {n: alpaca.read_json(p) for n, p in paths.items()}
+    except (OSError, ValueError) as exc:
+        print(f"judgebias: {exc}", file=sys.stderr)
+        return 2
+    outputs = []
+    if args.farm_judge:
+        rows = alpaca.convert_farm(data["farm_gpt4"], data["farm_human"])
+        outputs.append((args.farm_judge, rows, "GPT-4 judgments with human labels"))
+    if args.cross_judge:
+        rows = alpaca.convert_cross_judge(data["farm_gpt4"], data["farm_cross"])
+        outputs.append((args.cross_judge, rows, "GPT-4 judgments with cross-annotator labels"))
+    if args.human_pairs:
+        rows = alpaca.convert_cross_pairs(data["farm_cross"])
+        outputs.append((args.human_pairs, rows, "human-human rows"))
+    if args.eval_judges:
+        rows, skipped = alpaca.convert_eval(data["eval_gpt4"], data["eval_claude"])
+        print(f"left out {skipped} AlpacaEval rows with identical outputs or no verdict")
+        outputs.append((args.eval_judges, rows, "AlpacaEval judgments"))
+    if args.eval_claude_vs_gpt4:
+        rows = alpaca.convert_eval_cross(data["eval_claude"], data["eval_gpt4"])
+        outputs.append((args.eval_claude_vs_gpt4, rows, "Claude judgments with GPT-4 labels"))
+    if args.eval_gpt4_vs_claude:
+        rows = alpaca.convert_eval_cross(data["eval_gpt4"], data["eval_claude"])
+        outputs.append((args.eval_gpt4_vs_claude, rows, "GPT-4 judgments with Claude labels"))
+    for path, rows, what in outputs:
+        write_jsonl(path, rows)
+        print(f"wrote {len(rows)} {what} to {path}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "simulate":
@@ -352,6 +415,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_run(args)
     if args.command == "mtbench":
         return _cmd_mtbench(args)
+    if args.command == "alpaca":
+        return _cmd_alpaca(args)
     try:
         judgments = load_jsonl(args.path)
     except (OSError, ValueError) as exc:
