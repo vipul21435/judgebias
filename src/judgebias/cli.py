@@ -112,6 +112,8 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--humans", default=None, help="write judgments by the human judges here")
     m.add_argument("--judge", default=None,
                    help="write GPT-4 judgments paired with each human label here")
+    m.add_argument("--human-pairs", default=None,
+                   help="write human-against-human rows (an agreement baseline) here")
     m.add_argument("--inconsistent", choices=("tie", "drop"), default="tie",
                    help="order-inconsistent GPT-4 verdicts: keep as tie or drop (default tie)")
     return parser
@@ -166,6 +168,10 @@ def _cmd_mtbench(args: argparse.Namespace) -> int:
         rows = mtbench.convert_human(human_rows)
         write_jsonl(args.humans, rows)
         print(f"wrote {len(rows)} human judgments to {args.humans}")
+    if args.human_pairs:
+        rows = mtbench.convert_human_pairs(human_rows)
+        write_jsonl(args.human_pairs, rows)
+        print(f"wrote {len(rows)} human-human rows to {args.human_pairs}")
     if args.judge:
         rows = mtbench.convert_judge(judge_rows, human_rows, inconsistent=args.inconsistent)
         write_jsonl(args.judge, rows)

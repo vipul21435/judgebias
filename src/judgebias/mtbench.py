@@ -11,7 +11,8 @@ verdict of a GPT-4 judge that saw both presentation orders; a verdict of
 with the displayed order kept, so the position and length measures apply to
 the humans themselves. ``convert_judge`` pairs every human verdict with the
 GPT-4 verdict on the same pair, so the agreement and self-preference measures
-apply to the GPT-4 judge against human labels.
+apply to the GPT-4 judge against human labels. ``convert_human_pairs`` pairs
+human verdicts with each other, for a human-human baseline.
 
 Reading parquet needs ``pyarrow`` (install the ``mtbench`` extra); nothing
 else here depends on it.
@@ -161,6 +162,46 @@ def convert_judge(
                 "turn": h["turn"],
             }
         )
+    return out
+
+
+def convert_human_pairs(human_rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Human-against-human rows: a baseline for judge-against-human agreement.
+
+    For every pair of answers with verdicts from two or more different human
+    judges, each unordered pair of those judges gives one row: the earlier
+    judge's verdict as ``verdict`` (with its displayed order and its name as
+    ``judge``) and the later judge's verdict as ``human``. Auditing the file
+    gives human-human raw agreement and kappa on the same footing as the
+    judge file.
+    """
+    by_pair: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+    for row in human_rows:
+        c = _canonical(row)
+        by_pair.setdefault(c["pair_id"], []).append((str(row["judge"]), c))
+    out = []
+    for pair_id, votes in by_pair.items():
+        for i in range(len(votes)):
+            for k in range(i + 1, len(votes)):
+                (ja, a), (jb, b) = votes[i], votes[k]
+                if ja == jb:
+                    continue
+                out.append(
+                    {
+                        "pair_id": pair_id,
+                        "verdict": a["verdict"],
+                        "order": a["order"],
+                        "judge": ja,
+                        "len_a": a["len_a"],
+                        "len_b": a["len_b"],
+                        "model_a": a["model_a"],
+                        "model_b": a["model_b"],
+                        "human": b["verdict"],
+                        "human_judge": jb,
+                        "question_id": a["question_id"],
+                        "turn": a["turn"],
+                    }
+                )
     return out
 
 

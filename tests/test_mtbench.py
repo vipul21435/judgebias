@@ -3,11 +3,12 @@
 import pytest
 
 from judgebias.cli import main
-from judgebias.data import load_jsonl
+from judgebias.data import judgment_from_dict, load_jsonl
 from judgebias.measures import agreement, position_bias
 from judgebias.mtbench import (
     answer_text,
     convert_human,
+    convert_human_pairs,
     convert_judge,
     summary,
 )
@@ -88,6 +89,30 @@ def test_convert_judge_pairs_with_humans_and_handles_inconsistent():
     assert summary(judge_rows) == {"rows": 3, "decided": 1, "tie": 1, "inconsistent": 1}
 
 
+def test_convert_human_pairs_baseline():
+    rows = [
+        row(1, "x-model", "y-model", "model_a", "expert_0"),
+        row(1, "y-model", "x-model", "model_b", "expert_1"),  # also picked x
+        row(1, "x-model", "y-model", "tie", "expert_2"),
+        row(1, "x-model", "y-model", "model_b", "expert_0"),  # same judge again: no row
+        row(2, "x-model", "y-model", "model_a", "expert_0"),  # only one judge: no row
+    ]
+    out = convert_human_pairs(rows)
+    pairs = [(r["judge"], r["human_judge"]) for r in out]
+    assert pairs == [
+        ("expert_0", "expert_1"),
+        ("expert_0", "expert_2"),
+        ("expert_1", "expert_2"),
+        ("expert_1", "expert_0"),
+        ("expert_2", "expert_0"),
+    ]
+    assert out[0]["verdict"] == "A" and out[0]["human"] == "A"
+    assert out[1]["human"] == "tie"
+    assert out[2]["order"] == "BA"
+    judgments = [judgment_from_dict(r) for r in out]
+    assert agreement(judgments, reps=10)["raw"]["value"] == pytest.approx(1 / 5)
+
+
 def test_converted_rows_load_and_audit(tmp_path):
     from judgebias.data import write_jsonl
 
@@ -123,13 +148,16 @@ def test_cli_mtbench_offline(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("judgebias.mtbench.read_parquet", lambda p: data[p.stem])
     humans = tmp_path / "h.jsonl"
     judge = tmp_path / "j.jsonl"
+    pairs = tmp_path / "hh.jsonl"
     argv = ["mtbench", "--data-dir", str(tmp_path), "--humans", str(humans), "--judge", str(judge)]
+    argv += ["--human-pairs", str(pairs)]
     rc = main(argv)
     assert rc == 0
     out = capsys.readouterr().out
     assert "human rows 1; judge rows 1" in out
     assert load_jsonl(humans)[0].judge == "expert_0"
     assert load_jsonl(judge)[0].human == "A"
+    assert "wrote 0 human-human rows" in out
 
 
 def test_download_and_read_parquet(tmp_path, monkeypatch):
