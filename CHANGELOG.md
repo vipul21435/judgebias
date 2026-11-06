@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `judgebias alpaca`: converter for the public AlpacaFarm and AlpacaEval preference files (GPT-4 verdicts with human labels, the human cross-annotations as a human-human baseline, and the AlpacaEval GPT-4 and Claude judges set against each other). Pairs are matched on their texts and given sequential ids.
+- Results on that second dataset in the README: length slopes, agreement with humans and between the two judges, and self-preference of each judge relative to the other, with commands and a comparison with the MT-Bench figures. The files do not record the shown order, so no position-bias figure is claimed for them.
+- `docs/alpacaeval_length_bias.png` and a `--title` option for `examples/plot_length_bias.py`.
+
 ## 0.1.0 - 2026-11-06
 
 ### Added
