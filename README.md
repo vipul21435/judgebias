@@ -60,7 +60,7 @@ The last line is exact rather than lucky: a judge seen in both orders that never
 
 ### Run mode: judging pairs through an HTTP endpoint
 
-`judgebias run` sends each pair (`pair_id`, `prompt`, `answer_a`, `answer_b`, optional `model_a`, `model_b`, `human`) to any OpenAI-compatible `/chat/completions` endpoint, in both orders by default, and writes judgments ready for `audit`. The bearer token, if any, is read from the environment variable named by `--api-key-env` (default `JUDGE_API_KEY`). Replies that hold no readable verdict (see Limitations) are not turned into ties: the command prints how many there were and leaves them out, and `--unparsed PATH` writes each one with its pair, order and reply text. The judge is pluggable in Python: anything callable as `judge(prompt, first, second) -> "first" | "second" | "tie"` works with `judgebias.judge.run_pairs`.
+`judgebias run` sends each pair (`pair_id`, `prompt`, `answer_a`, `answer_b`, optional `model_a`, `model_b`, `human`) to any OpenAI-compatible `/chat/completions` endpoint, in both orders by default, and writes judgments ready for `audit`. The bearer token, if any, is read from the environment variable named by `--api-key-env` (default `JUDGE_API_KEY`). Replies that hold no readable verdict (see Limitations) are not turned into ties: the command prints how many there were and leaves them out, and `--unparsed PATH` writes each one with its pair, order and reply text. The judge is pluggable in Python: anything callable as `judge(prompt, first, second) -> "first" | "second" | "tie" | "unparsed"` works with `judgebias.judge.run_pairs`.
 
 `examples/stub_judge_server.py` is a local stand-in server that prefers the longer answer and says "first" when the two lengths are within 20 characters. Against the 12 hand-written pairs in `examples/pairs.jsonl`:
 
@@ -95,6 +95,7 @@ Every interval resamples prompts (`pair_id`), not rows, so both presentation ord
 - **Agreement.** Raw agreement and Cohen's kappa, (p_o - p_e) / (1 - p_e) over the full confusion table, between judge and human labels. With `--ties keep`, tie is a third category on both sides (the paper's setup S1, which counts an order-inconsistent verdict as a tie); with `--ties drop`, any row where either side said tie is removed (setup S2). The number of rows each setup keeps is printed, so a high S2 figure on few rows is visible as such.
 - **Repeat consistency.** For each (pair, order, judge) with two or more samples told apart by `repeat`, the share of unanimous groups and the share of agreeing sample pairs. Rows that share all four keys are one sample listed several times and count once; different judges are never treated as repeats of each other.
 - **Copied rows.** A file that lists one judge verdict once per human label repeats that verdict; the position and length measures, which describe the judge, keep one row per (pair, order, judge, repeat). Agreement and self-preference compare row by row with the human labels and use every row.
+- **Tests.** `uv run pytest -q --cov=judgebias` runs 80 offline tests (fake transports, synthetic judges with known biases, small hand-built MT-Bench rows, and a simulation check of interval coverage) and reports 99 % line coverage of the package.
 
 ## Results on real public data
 
