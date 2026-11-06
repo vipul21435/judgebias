@@ -585,3 +585,57 @@ def test_combined_order_rows_never_enter_swap_units():
     p = position_bias(js, reps=5)
     assert p["n_pairs_both_orders"] == 0
     assert math.isnan(p["flip_rate"]["value"])
+
+
+def test_longer_win_rate_leaves_out_ties_and_equal_lengths():
+    js = [
+        j("p1", "A", len_a=10, len_b=5),
+        j("p2", "B", len_a=10, len_b=5),
+        j("p3", "tie", len_a=10, len_b=5),
+        j("p4", "A", len_a=5, len_b=5),
+    ]
+    ln = length_bias(js, reps=5)
+    assert ln["longer_win_rate"]["value"] == 0.5
+    assert ln["n_used"] == 3  # the tie is out of the fit; equal lengths stay in it
+
+
+def test_own_family_rates_leave_out_ties_on_each_side():
+    fam = {"judge": "gamma-70b", "model_a": "gamma-7b", "model_b": "beta-13b"}
+    js = [
+        j("p1", "A", human="A", **fam),
+        j("p2", "B", human="tie", **fam),
+        j("p3", "tie", human="B", **fam),
+        j("p4", "A", human="A", **fam),
+    ]
+    s = self_preference(js, reps=5)
+    assert s["n_used"] == 4
+    assert s["own_win_rate"]["value"] == pytest.approx(2 / 3)
+    assert s["own_win_rate_human"]["value"] == pytest.approx(2 / 3)
+    assert s["excess"]["value"] == pytest.approx(0.0)
+
+
+def test_adjusted_slope_is_nan_on_one_verdict_class():
+    from judgebias.measures import _adjusted_slope
+
+    rows = [
+        j(f"p{i}", "A", len_a=10 + 7 * i, len_b=40, human="AB"[i % 2]) for i in range(6)
+    ]
+    assert math.isnan(_adjusted_slope([rows]))
+    rows[0] = j("p0", "B", len_a=10, len_b=40, human="A")
+    assert math.isfinite(_adjusted_slope([rows]))
+
+
+def test_zero_length_answers_load_and_fit(tmp_path):
+    path = tmp_path / "z.jsonl"
+    rows = [
+        {"pair_id": "p1", "verdict": "B", "answer_a": "", "answer_b": "some text"},
+        {"pair_id": "p2", "verdict": "A", "len_a": 0, "len_b": 3},
+        {"pair_id": "p3", "verdict": "A", "len_a": 12, "len_b": 0},
+        {"pair_id": "p4", "verdict": "B", "len_a": 2, "len_b": 9},
+    ]
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    js = load_jsonl(path)
+    assert [x.len_a for x in js] == [0, 0, 12, 2]
+    ln = length_bias(js, reps=20)
+    assert ln["n_used"] == 4
+    assert math.isfinite(ln["slope"]["value"])
