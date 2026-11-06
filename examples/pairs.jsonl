@@ -1,0 +1,12 @@
+{"pair_id": "q00", "prompt": "What is the boiling point of water at sea level?", "answer_a": "100 degrees Celsius.", "answer_b": "Water boils at 100 degrees Celsius (212 degrees Fahrenheit) at standard sea-level pressure.", "human": "B"}
+{"pair_id": "q01", "prompt": "Name a prime number between 10 and 20.", "answer_a": "13 is prime.", "answer_b": "11", "human": "tie"}
+{"pair_id": "q02", "prompt": "Explain what a hash map is in one sentence.", "answer_a": "A hash map stores key-value pairs and finds a value by hashing its key to a bucket.", "answer_b": "It is a map.", "human": "A"}
+{"pair_id": "q03", "prompt": "Give a synonym for 'quick'.", "answer_a": "Fast.", "answer_b": "Rapid.", "human": "tie"}
+{"pair_id": "q04", "prompt": "What does HTTP stand for?", "answer_a": "Hypertext Transfer Protocol.", "answer_b": "HyperText Transfer Protocol, the request-response protocol used by web browsers and servers.", "human": "B"}
+{"pair_id": "q05", "prompt": "Convert 3 km to metres.", "answer_a": "3000 m", "answer_b": "3,000 metres", "human": "tie"}
+{"pair_id": "q06", "prompt": "Why is the sky blue?", "answer_a": "Air molecules scatter short blue wavelengths of sunlight more than long red ones, so scattered blue light reaches the eye from every direction.", "answer_b": "Because of the ocean.", "human": "A"}
+{"pair_id": "q07", "prompt": "What is 12 times 12?", "answer_a": "144", "answer_b": "124", "human": "A"}
+{"pair_id": "q08", "prompt": "Name the largest planet in the solar system.", "answer_a": "Jupiter.", "answer_b": "Saturn, which is famous for its rings and is very large indeed.", "human": "A"}
+{"pair_id": "q09", "prompt": "What is the capital of Canada?", "answer_a": "Toronto is the largest city and the capital of Canada.", "answer_b": "Ottawa.", "human": "B"}
+{"pair_id": "q10", "prompt": "Write a haiku about rain.", "answer_a": "Soft rain on the roof / the gutter hums a low tune / puddles hold the sky", "answer_b": "Rain falls down today / it is wet and it is grey / I stay in the house", "human": "A"}
+{"pair_id": "q11", "prompt": "What is the chemical symbol for gold?", "answer_a": "Au", "answer_b": "Ag", "human": "A"}
