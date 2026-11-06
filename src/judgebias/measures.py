@@ -108,13 +108,22 @@ def _flip_rate(groups: Sequence[Sequence[Judgment]]) -> float:
     return _nan_if_empty(flips, len(units))
 
 
+def _flipped_units(groups: Sequence[Sequence[Judgment]]) -> list[tuple[Judgment, Judgment]]:
+    return [(a, b) for g in groups for a, b in _swap_units(g) if a.verdict != b.verdict]
+
+
 def _consistent_first_rate(groups: Sequence[Sequence[Judgment]]) -> float:
     """Among flipped units, the share where the judge took the first answer both times."""
-    flipped = [
-        (a, b) for g in groups for a, b in _swap_units(g) if a.verdict != b.verdict
-    ]
-    first_both = sum(bool(a.picked_first and b.picked_first) for a, b in flipped)
+    flipped = _flipped_units(groups)
+    first_both = sum(a.picked_first is True and b.picked_first is True for a, b in flipped)
     return _nan_if_empty(first_both, len(flipped))
+
+
+def _consistent_second_rate(groups: Sequence[Sequence[Judgment]]) -> float:
+    """Among flipped units, the share where the judge took the second answer both times."""
+    flipped = _flipped_units(groups)
+    second_both = sum(a.picked_first is False and b.picked_first is False for a, b in flipped)
+    return _nan_if_empty(second_both, len(flipped))
 
 
 def position_bias(
@@ -130,9 +139,11 @@ def position_bias(
     there is one judge and no repeats). Verdicts by different judges are never
     compared with each other. ``first_both_rate`` is, among flipped units, the
     share where the judge
-    chose the first-shown answer both times (a pure position preference) as
-    opposed to the second both times. Rows whose verdict already combines both
-    orders (``flipped`` set) are left out of those three and give
+    chose the first-shown answer both times (a pure position preference);
+    ``second_both_rate`` is the share where it chose the second both times.
+    The rest of the flips are those where one of the two orders gave a tie.
+    Rows whose verdict already combines both
+    orders (``flipped`` set) are left out of those four and give
     ``combined_flip_rate`` instead: the share flagged as flipped. Copied rows
     count once (see :func:`distinct`).
 
@@ -160,6 +171,8 @@ def position_bias(
         "n_pairs_both_orders": both,
         "flip_rate": bootstrap(groups, _flip_rate, reps=reps, seed=seed).as_dict(),
         "first_both_rate": bootstrap(groups, _consistent_first_rate, reps=reps, seed=seed)
+        .as_dict(),
+        "second_both_rate": bootstrap(groups, _consistent_second_rate, reps=reps, seed=seed)
         .as_dict(),
         "n_combined": n_combined,
     }

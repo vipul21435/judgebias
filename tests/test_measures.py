@@ -639,3 +639,16 @@ def test_zero_length_answers_load_and_fit(tmp_path):
     ln = length_bias(js, reps=20)
     assert ln["n_used"] == 4
     assert math.isfinite(ln["slope"]["value"])
+
+
+def test_tie_flips_are_neither_first_both_nor_second_both():
+    js = [
+        j("p1", "A"), j("p1", "tie", order="BA"),
+        j("p2", "B"), j("p2", "tie", order="BA"),
+        j("p3", "A"), j("p3", "B", order="BA"),
+        j("p4", "B"), j("p4", "A", order="BA"),
+    ]
+    p = position_bias(js, reps=5)
+    assert p["flip_rate"]["value"] == 1.0
+    assert p["first_both_rate"]["value"] == pytest.approx(1 / 4)
+    assert p["second_both_rate"]["value"] == pytest.approx(1 / 4)
