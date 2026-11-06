@@ -369,6 +369,7 @@ def _cmd_alpaca(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as exc:
         print(f"judgebias: {exc}", file=sys.stderr)
         return 2
+    print("rows read: " + ", ".join(f"{n} {len(rows)}" for n, rows in data.items()))
     outputs = []
     if args.farm_judge:
         rows = alpaca.convert_farm(data["farm_gpt4"], data["farm_human"])

@@ -194,7 +194,9 @@ def test_cli_alpaca_reads_local_files(tmp_path, monkeypatch, capsys):
     assert len(load_jsonl(outs["ej"])) == 2
     assert load_jsonl(outs["cg"])[0].judge == "claude"
     assert load_jsonl(outs["gc"])[0].judge == "alpaca_eval_gpt4"
-    assert "wrote 2 GPT-4 judgments with human labels" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "rows read: farm_human 2, farm_gpt4 2, farm_cross 2, eval_gpt4 1, eval_claude 1" in out
+    assert "wrote 2 GPT-4 judgments with human labels" in out
 
 
 def test_cli_alpaca_needs_an_output(tmp_path, capsys):
