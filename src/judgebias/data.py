@@ -26,6 +26,15 @@ ORDERS = ("AB", "BA")
 
 @dataclass(frozen=True)
 class Judgment:
+    """One verdict by one judge on a pair of answers.
+
+    ``verdict`` and ``human`` are ``"A"``, ``"B"`` or ``"tie"`` by answer name;
+    ``order`` is ``"AB"`` or ``"BA"`` (which answer was shown first);
+    ``len_a`` / ``len_b`` are non-negative lengths; ``repeat`` tells repeated
+    samples of the same pair, order and judge apart; ``flipped`` is set only
+    on verdicts that already combine both orders. ``extra`` keeps unknown keys.
+    """
+
     pair_id: str
     verdict: str
     order: str = "AB"

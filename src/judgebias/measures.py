@@ -279,8 +279,8 @@ def self_preference(
     """Win rate of answers from the judge's own family against the rest.
 
     A judgment counts when exactly one of ``model_a`` / ``model_b`` matches the
-    judge's family, where family is the model name up to the first ``-`` or
-    ``/`` (``judge="gpt-4"`` and ``model_a="gpt-3.5"`` share family ``gpt``).
+    judge's family (see :func:`family`; ``judge="gpt-4"`` and
+    ``model_a="gpt-3.5"`` share family ``gpt``).
     Each row is matched against its own judge's family; ``judge_family``
     lists every judge family in the input, comma-separated.
     ``own_win_rate`` above the judge's overall win rate for that family on
@@ -334,6 +334,7 @@ def self_preference(
 
 
 def family(model: str | None) -> str | None:
+    """Lower-cased model name up to the first ``/``, ``-``, ``_`` or ``:``."""
     if model is None:
         return None
     text = model.lower()

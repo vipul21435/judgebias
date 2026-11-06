@@ -23,6 +23,7 @@ class Estimate:
     level: float = 0.95
 
     def as_dict(self) -> dict[str, Any]:
+        """The estimate as a plain dict (value, low, high, n, level)."""
         return {
             "value": self.value,
             "low": self.low,

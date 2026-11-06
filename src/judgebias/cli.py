@@ -96,7 +96,11 @@ def _positive(text: str) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="judgebias", description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="judgebias",
+        description="Audit an LLM judge for position bias, length bias, self-preference, "
+        "repeat consistency and agreement with human labels.",
+    )
     parser.add_argument("--version", action="version", version=f"judgebias {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 

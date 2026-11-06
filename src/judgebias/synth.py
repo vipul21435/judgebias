@@ -80,6 +80,7 @@ def simulate(
 
 
 def to_rows(judgments: list[Judgment]) -> list[dict[str, Any]]:
+    """Judgments as dicts ready for :func:`judgebias.write_jsonl`."""
     rows = []
     for j in judgments:
         rows.append(
