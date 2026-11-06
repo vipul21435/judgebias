@@ -101,17 +101,34 @@ def logistic_fit(x: np.ndarray, y: np.ndarray, *, l2: float = 1e-4) -> tuple[flo
         return float("nan"), float("nan")
     if np.all(y == y[0]):
         return (float("inf") if y[0] == 1 else float("-inf")), 0.0
+    w = logistic_fit_multi(x[:, None], y, l2=l2)
+    return float(w[0]), float(w[1])
+
+
+def logistic_fit_multi(x: np.ndarray, y: np.ndarray, *, l2: float = 1e-4) -> np.ndarray:
+    """Fit P(y=1) = sigmoid(w0 + x @ w[1:]) by penalised maximum likelihood.
+
+    ``x`` has one row per observation and one column per covariate. The L2
+    penalty applies to the covariate weights, not the intercept. Returns the
+    weights with the intercept first.
+    """
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    if x.ndim != 2 or x.shape[0] != y.shape[0]:
+        raise ValueError("x must be 2-D with one row per element of y")
+    design = np.hstack([np.ones((x.shape[0], 1)), x])
+    penalty = np.full(design.shape[1], l2)
+    penalty[0] = 0.0
 
     def nll(w: np.ndarray) -> float:
-        z = w[0] + w[1] * x
+        z = design @ w
         # log-likelihood of logistic regression via log-sum-exp
         ll = y * z - np.logaddexp(0.0, z)
-        return float(-ll.sum() + 0.5 * l2 * (w[1] ** 2))
+        return float(-ll.sum() + 0.5 * np.sum(penalty * w * w))
 
     def grad(w: np.ndarray) -> np.ndarray:
-        z = w[0] + w[1] * x
-        r = expit(z) - y
-        return np.array([r.sum(), (r * x).sum() + l2 * w[1]])
+        r = expit(design @ w) - y
+        return design.T @ r + penalty * w
 
-    res = minimize(nll, np.zeros(2), jac=grad, method="L-BFGS-B")
-    return float(res.x[0]), float(res.x[1])
+    res = minimize(nll, np.zeros(design.shape[1]), jac=grad, method="L-BFGS-B")
+    return np.asarray(res.x, dtype=float)

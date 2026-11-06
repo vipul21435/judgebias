@@ -372,3 +372,27 @@ def test_combined_order_rows_give_flip_rate_not_first_win_rate(tmp_path, capsys)
     assert "first-position win rate" not in out
     with pytest.raises(ValueError):
         judgment_from_dict({"pair_id": "x", "verdict": "A", "flipped": "maybe"})
+
+
+def test_logistic_fit_multi_recovers_two_coefficients():
+    from judgebias.stats import logistic_fit_multi
+
+    rng = np.random.default_rng(3)
+    x = rng.normal(size=(4000, 2))
+    p = 1 / (1 + np.exp(-(0.3 + 1.2 * x[:, 0] - 0.8 * x[:, 1])))
+    y = (rng.random(4000) < p).astype(float)
+    w = logistic_fit_multi(x, y)
+    assert w == pytest.approx([0.3, 1.2, -0.8], abs=0.15)
+    with pytest.raises(ValueError):
+        logistic_fit_multi(np.zeros(3), np.zeros(3))
+
+
+def test_slope_given_human_separates_judge_length_pull():
+    # humans follow the truth; the length-biased judge adds a pull of its own
+    fair = length_bias(simulate(400, length=0.0, seed=12), reps=100)
+    biased = length_bias(simulate(400, length=1.5, seed=12), reps=100)
+    assert fair["n_adjusted"] > 0
+    assert abs(fair["slope_given_human"]["value"]) < 0.5
+    assert biased["slope_given_human"]["low"] > 0.5
+    plain = [j(f"p{i}", "A", len_a=10 + i, len_b=10) for i in range(5)]
+    assert "slope_given_human" not in length_bias(plain, reps=5)

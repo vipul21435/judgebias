@@ -48,6 +48,8 @@ def render(report: dict[str, Any]) -> str:
         lines.append("length bias")
         lines.append(f"  longer-answer win rate   {_fmt(ln['longer_win_rate'])}")
         lines.append(f"  logistic slope (log len ratio)  {_fmt(ln['slope'])}")
+        if "slope_given_human" in ln:
+            lines.append(f"  same, given human label  {_fmt(ln['slope_given_human'])}")
     if "self_preference" in report:
         s = report["self_preference"]
         lines.append(f"self-preference (judge family {s['judge_family']})")

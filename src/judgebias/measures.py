@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 
 from .data import Judgment
-from .stats import Estimate, bootstrap, cohen_kappa, logistic_fit
+from .stats import Estimate, bootstrap, cohen_kappa, logistic_fit, logistic_fit_multi
 
 
 def _by_pair(judgments: Sequence[Judgment]) -> list[list[Judgment]]:
@@ -167,6 +167,25 @@ def _slope(groups: Sequence[Sequence[Judgment]]) -> float:
     return logistic_fit(x, y)[1]
 
 
+def _adjusted_rows(judgments: Sequence[Judgment]) -> tuple[np.ndarray, np.ndarray]:
+    """Covariates (log length ratio, human label as +1/-1) and judge verdicts."""
+    xs: list[tuple[float, float]] = []
+    ys: list[float] = []
+    for j in judgments:
+        if j.verdict == "tie" or j.human in (None, "tie") or j.len_a is None or j.len_b is None:
+            continue
+        xs.append((float(np.log((j.len_a + 1) / (j.len_b + 1))), 1.0 if j.human == "A" else -1.0))
+        ys.append(1.0 if j.verdict == "A" else 0.0)
+    return np.asarray(xs, dtype=float).reshape(-1, 2), np.asarray(ys)
+
+
+def _adjusted_slope(groups: Sequence[Sequence[Judgment]]) -> float:
+    x, y = _adjusted_rows(_flat(groups))
+    if x.shape[0] < 3 or np.all(y == y[0]):
+        return float("nan")
+    return float(logistic_fit_multi(x, y)[1])
+
+
 def _longer_win_rate(groups: Sequence[Sequence[Judgment]]) -> float:
     wins = 0
     decided = 0
@@ -190,12 +209,21 @@ def length_bias(
     length does not move the verdict, positive means longer answers win more.
     Both come with a bootstrap interval over prompts. Copied rows count once
     (see :func:`distinct`).
+
+    When human labels are present, ``slope_given_human`` is the length
+    coefficient in a fit that also has the human label (+1 for A, -1 for B)
+    as a covariate, on rows where neither side said tie. It asks whether
+    length moves the judge beyond what it moves the humans: answers that are
+    longer because they are better push the human label too, and that part
+    goes to the human coefficient. Every labelled row is used, so a verdict
+    with several human labels enters once per label.
     """
+    all_rows = judgments
     judgments = distinct(judgments)
     groups = _by_pair(judgments)
     x, y = _length_rows(judgments)
     intercept, slope = logistic_fit(x, y) if x.size >= 2 else (float("nan"), float("nan"))
-    return {
+    out: dict[str, Any] = {
         "n_used": int(x.size),
         "longer_win_rate": bootstrap(groups, _longer_win_rate, reps=reps, seed=seed).as_dict(),
         "intercept": intercept,
@@ -205,6 +233,14 @@ def length_bias(
             n=len(groups),
         ).as_dict(),
     }
+    xa, _ = _adjusted_rows(all_rows)
+    if xa.shape[0]:
+        labelled = _by_pair(all_rows)
+        out["n_adjusted"] = int(xa.shape[0])
+        out["slope_given_human"] = bootstrap(
+            labelled, _adjusted_slope, reps=reps, seed=seed
+        ).as_dict()
+    return out
 
 
 def _interval(groups, statistic, reps, seed) -> tuple[float, float]:
