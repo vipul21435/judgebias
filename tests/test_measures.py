@@ -203,7 +203,9 @@ def test_length_bias_skips_missing_and_ties():
 def test_cohen_kappa_known_values():
     assert cohen_kappa(["A", "B", "A", "B"], ["A", "B", "A", "B"]) == 1.0
     assert cohen_kappa(["A", "A", "B", "B"], ["A", "B", "A", "B"]) == pytest.approx(0.0)
-    assert cohen_kappa(["A", "A"], ["A", "A"]) == 1.0
+    # both raters constant: chance agreement is 1 and kappa is undefined
+    assert math.isnan(cohen_kappa(["A", "A"], ["A", "A"]))
+    assert cohen_kappa(["A", "A"], ["B", "B"]) == 0.0
     assert math.isnan(cohen_kappa([], []))
     with pytest.raises(ValueError):
         cohen_kappa(["A"], [])

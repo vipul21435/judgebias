@@ -71,7 +71,9 @@ def cohen_kappa(a: Sequence[str], b: Sequence[str]) -> float:
 
     Labels are compared as given; a tie label is one more category, so a
     judge that says tie where the human says A is a disagreement.
-    Returns nan on empty input and 1.0 when both raters are constant and equal.
+    Returns nan on empty input and when both raters use one label each
+    (chance agreement is then 1 and kappa is undefined), so that a bootstrap
+    drops such a resample instead of counting it as perfect agreement.
     """
     if len(a) != len(b):
         raise ValueError("label sequences differ in length")
@@ -86,7 +88,7 @@ def cohen_kappa(a: Sequence[str], b: Sequence[str]) -> float:
     po = np.trace(table) / n
     pe = float(np.sum(table.sum(axis=1) * table.sum(axis=0)) / (n * n))
     if pe >= 1.0:
-        return 1.0 if po >= 1.0 else 0.0
+        return float("nan")
     return float((po - pe) / (1.0 - pe))
 
 
