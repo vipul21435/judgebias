@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from .data import Judgment
+from .data import Judgment, _norm_verdict, iter_jsonl
 
 Transport = Callable[[str, dict[str, str], bytes, float], dict[str, Any]]
 JudgeFn = Callable[[str, str, str], str]
@@ -56,26 +56,41 @@ class Pair:
 
 
 def pair_from_dict(row: dict[str, Any]) -> Pair:
+    """Build a Pair from a dict with ``pair_id``, ``prompt``, ``answer_a``, ``answer_b``.
+
+    ``human``, if present, is read the way the audit loader reads verdicts
+    (``a``, ``model_a``, ``draw`` and so on), so a bad label fails here,
+    before any request is sent. Other keys go to ``extra``.
+    """
+    if not isinstance(row, dict):
+        raise ValueError(f"expected a JSON object, got {type(row).__name__}")
     known = ("pair_id", "prompt", "answer_a", "answer_b", "model_a", "model_b", "human")
     missing = [k for k in ("pair_id", "prompt", "answer_a", "answer_b") if k not in row]
     if missing:
         raise ValueError(f"pair row is missing {missing}")
+    human = row.get("human")
+    model_a, model_b = row.get("model_a"), row.get("model_b")
     return Pair(
         pair_id=str(row["pair_id"]),
         prompt=str(row["prompt"]),
         answer_a=str(row["answer_a"]),
         answer_b=str(row["answer_b"]),
-        model_a=row.get("model_a"),
-        model_b=row.get("model_b"),
-        human=row.get("human"),
+        model_a=None if model_a is None else str(model_a),
+        model_b=None if model_b is None else str(model_b),
+        human=None if human is None else _norm_verdict(human),
         extra={k: v for k, v in row.items() if k not in known},
     )
 
 
 def load_pairs(path: str) -> list[Pair]:
-    from .data import iter_jsonl
-
-    return [pair_from_dict(row) for _, row in iter_jsonl(path)]
+    """Read a JSONL file of pairs; a bad row raises ValueError naming its line."""
+    out = []
+    for lineno, row in iter_jsonl(path):
+        try:
+            out.append(pair_from_dict(row))
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"{path}:{lineno}: {exc}") from exc
+    return out
 
 
 UNPARSED = "unparsed"

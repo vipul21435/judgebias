@@ -227,3 +227,39 @@ def test_cli_run_keeps_judgments_made_before_a_failure(tmp_path, capsys, monkeyp
     ]
     assert main(["run", str(pairs), "--out", str(tmp_path / "no" / "o.jsonl"),
                  "--model", "m"]) == 2
+
+
+def test_pair_human_label_is_normalised_or_refused():
+    base = {"pair_id": "p", "prompt": "q", "answer_a": "x", "answer_b": "yy"}
+    assert pair_from_dict({**base, "human": "a"}).human == "A"
+    assert pair_from_dict({**base, "human": "model_b"}).human == "B"
+    assert pair_from_dict({**base, "human": "draw"}).human == "tie"
+    with pytest.raises(ValueError):
+        pair_from_dict({**base, "human": "maybe"})
+    assert pair_from_dict({**base, "model_a": 5}).model_a == "5"
+
+
+def test_cli_run_refuses_bad_human_label_before_any_request(tmp_path, capsys, monkeypatch):
+    pairs = tmp_path / "pairs.jsonl"
+    write_jsonl(pairs, [
+        {"pair_id": "p1", "prompt": "q", "answer_a": "x", "answer_b": "yy", "human": "a"},
+        {"pair_id": "p2", "prompt": "q", "answer_a": "x", "answer_b": "yy", "human": "maybe"},
+    ])
+    calls = []
+    monkeypatch.setattr("judgebias.judge.urllib_transport",
+                        lambda *a: calls.append(a) or reply("1"))
+    rc = main(["run", str(pairs), "--out", str(tmp_path / "o.jsonl"), "--model", "m"])
+    assert rc == 2
+    assert calls == []
+    assert "pairs.jsonl:2:" in capsys.readouterr().err
+
+
+def test_missing_pair_fields_name_the_line(tmp_path):
+    pairs = tmp_path / "pairs.jsonl"
+    write_jsonl(pairs, [{"pair_id": "p1", "prompt": "q", "answer_a": "x", "answer_b": "y"},
+                        {"pair_id": "p2", "prompt": "q"}])
+    with pytest.raises(ValueError, match=r"pairs.jsonl:2: pair row is missing"):
+        load_pairs(str(pairs))
+    pairs.write_text("7\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"pairs.jsonl:1: expected a JSON object"):
+        load_pairs(str(pairs))
