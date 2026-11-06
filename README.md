@@ -171,6 +171,7 @@ Tests: `uv run pytest -q --cov=judgebias` runs 141 offline tests (fake transport
 - [prefpairs](https://github.com/vipul21435/prefpairs): pairwise preference data and Bradley-Terry / Elo ratings, for turning audited verdicts into model rankings.
 - [rubricops](https://github.com/vipul21435/rubricops): versioned rubrics and inter-rater agreement for human labels.
 - [graderguard](https://github.com/vipul21435/graderguard): audit graders for reward hacking and flakiness.
+- [patchsim](https://github.com/vipul21435/patchsim): how far textual similarity to the gold patch goes as a proxy for correctness, checked against test outcomes; the same question of a cheap grader against a reference, for code.
 - [datasieve](https://github.com/vipul21435/datasieve): validate and deduplicate SFT and preference data before it is judged.
 
 ## Licence
