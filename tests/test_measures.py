@@ -62,6 +62,11 @@ def test_judgment_from_dict_aliases_and_lengths():
         judgment_from_dict({"verdict": "A"})
     with pytest.raises(ValueError):
         judgment_from_dict({"pair_id": "1", "verdict": "strongly A"})
+    for numeric in (0, 1, "2", 1.0):
+        with pytest.raises(ValueError, match="numeric verdict"):
+            judgment_from_dict({"pair_id": "1", "verdict": numeric})
+    with pytest.raises(ValueError, match="numeric verdict"):
+        judgment_from_dict({"pair_id": "1", "verdict": "A", "human": 0})
 
 
 def test_load_jsonl_reports_bad_line(tmp_path):

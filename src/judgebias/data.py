@@ -78,11 +78,22 @@ _ALIASES = {
 
 
 def _norm_verdict(value: Any) -> str:
+    """Read a verdict by answer name.
+
+    Numeric labels are refused: some datasets use 0 for A and 1 for B, while
+    run mode and most judge prompts use 1 for the first answer, and a silent
+    choice between the two would swap every verdict in a file.
+    """
     text = str(value).strip().lower()
-    if text in ("a", "model_a", "first", "0"):
+    if text in ("a", "model_a", "first"):
         return "A"
-    if text in ("b", "model_b", "second", "1"):
+    if text in ("b", "model_b", "second"):
         return "B"
+    if text in ("0", "1", "2", "0.0", "1.0", "2.0"):
+        raise ValueError(
+            f"numeric verdict {value!r} is ambiguous (0/1 or 1/2 for A/B?); "
+            "write A, B or tie"
+        )
     if text in ("tie", "draw", "equal", "both", "neither", "tie (bothbad)", "tie (bothgood)"):
         return "tie"
     raise ValueError(f"cannot read verdict {value!r}")

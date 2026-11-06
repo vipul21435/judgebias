@@ -16,7 +16,7 @@ Python 3.10 or newer; depends on numpy and scipy. Reading the MT-Bench parquet f
 
 ## Quickstart
 
-Each line of the input is one judgment. `verdict` is `A`, `B` or `tie` and names the answer, not the slot it was shown in; `order` is `AB` (A shown first, the default) or `BA`. `len_a`, `len_b`, `model_a`, `model_b`, `human`, `repeat` and `flipped` are optional and switch on the measures that need them. A few common key spellings are accepted (`winner` for `verdict`, `question_id` for `pair_id`, `answer_a` text in place of `len_a`, `inconsistent` for `flipped`).
+Each line of the input is one judgment. `verdict` is `A`, `B` or `tie` and names the answer, not the slot it was shown in (numeric labels such as `0` / `1` are refused with an error, since datasets disagree on whether 0 or 1 means A); `order` is `AB` (A shown first, the default) or `BA`. `len_a`, `len_b`, `model_a`, `model_b`, `human`, `repeat` and `flipped` are optional and switch on the measures that need them. A few common key spellings are accepted (`winner` for `verdict`, `question_id` for `pair_id`, `answer_a` text in place of `len_a`, `inconsistent` for `flipped`).
 
 ```
 {"pair_id": "p00000", "verdict": "A", "order": "AB", "judge": "gamma-70b", "len_a": 451, "len_b": 189, "model_a": "alpha-7b", "model_b": "delta-8x7b", "human": "B", "repeat": 0}
