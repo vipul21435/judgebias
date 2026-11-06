@@ -299,14 +299,20 @@ def agreement(
 def repeat_consistency(judgments: Sequence[Judgment]) -> dict[str, Any]:
     """How often repeated judgments of the same pair in the same order agree.
 
-    ``unanimous_rate`` is the share of (pair, order) groups with 2+ samples
-    whose verdicts all match; ``pairwise_agreement`` is the share of all
-    sample pairs within a group that match.
+    A group is one (pair, order, judge); its samples are told apart by the
+    ``repeat`` index, and rows that share all four keys are copies of one
+    sample (for example one judge verdict listed once per human label) and
+    count once. Different judges on the same pair are not repeats of each
+    other; their agreement is what :func:`agreement` measures.
+
+    ``unanimous_rate`` is the share of groups with 2+ samples whose verdicts
+    all match; ``pairwise_agreement`` is the share of all sample pairs within
+    a group that match.
     """
-    groups: dict[tuple[str, str], list[str]] = defaultdict(list)
+    samples: dict[tuple[str, str, str], dict[int, str]] = defaultdict(dict)
     for j in judgments:
-        groups[(j.pair_id, j.order)].append(j.verdict)
-    multi = [v for v in groups.values() if len(v) >= 2]
+        samples[(j.pair_id, j.order, j.judge)].setdefault(j.repeat, j.verdict)
+    multi = [list(v.values()) for v in samples.values() if len(v) >= 2]
     unanimous = sum(len(set(v)) == 1 for v in multi)
     agree = 0
     total = 0

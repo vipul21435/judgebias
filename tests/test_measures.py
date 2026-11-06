@@ -237,6 +237,18 @@ def test_repeat_consistency():
     assert math.isnan(repeat_consistency([j("p", "A")])["unanimous_rate"])
 
 
+def test_repeat_consistency_ignores_copies_and_other_judges():
+    # one verdict copied once per human label is a single sample, not a repeat
+    copies = [j("p1", "A", human=h) for h in ("A", "B", "tie")]
+    assert repeat_consistency(copies)["n_groups"] == 0
+    # two different judges on the same pair are not repeats of each other
+    judges = [j("p1", "A", judge="x"), j("p1", "B", judge="y")]
+    assert repeat_consistency(judges)["n_groups"] == 0
+    mixed = judges + [j("p1", "B", judge="x", repeat=1)]
+    r = repeat_consistency(mixed)
+    assert r["n_groups"] == 1 and r["unanimous_rate"] == 0.0
+
+
 # --- simulation: known biases are detected ---------------------------------
 
 
