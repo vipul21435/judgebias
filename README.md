@@ -162,7 +162,7 @@ Data: public preference files from the AlpacaFarm and AlpacaEval projects, relea
 - `alpaca_farm_human_crossannotations`: 2,596 human labels on 648 pairs, about four per pair, by 16 annotators named by index. 190 of these pairs also have a GPT-4 label.
 - `alpaca_eval_annotations_alpaca_eval_gpt4` and `alpaca_eval_annotations_claude`: verdicts of a GPT-4 judge and a Claude judge on the same 10,465 AlpacaEval pairs, each the answer of one of several models against the `text_davinci_003` baseline. These have no human labels. Pairs with identical outputs carry no verdict; they and rows without a verdict are left out (1,822 rows over the two files, as the command prints), and 9,553 pairs have a verdict from both judges.
 
-None of the converted files contains a tie, so the ties-dropped agreement equals the ties-kept one and only one is given. Commands (the largest audit, `farm_gpt4.jsonl`, took about a minute here):
+None of the converted files contains a tie, so the ties-dropped agreement equals the ties-kept one and only one is given. Commands (the largest audit, `farm_gpt4.jsonl`, took 86 s here at the default 1000 draws):
 
 ```
 judgebias alpaca --data-dir alp --farm-judge farm_gpt4.jsonl --cross-judge cross_gpt4.jsonl \
