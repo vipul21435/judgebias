@@ -7,11 +7,12 @@ import json
 import math
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from . import __version__
 from .data import load_jsonl, write_jsonl
-from .judge import HttpJudge, load_pairs, run_pairs
+from .judge import HttpJudge, check_template, load_pairs, run_pairs
 from .measures import audit
 from .synth import simulate, to_rows
 
@@ -139,6 +140,15 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--temperature", type=float, default=0.0,
                    help="sampling temperature sent in the request (default 0)")
     r.add_argument("--timeout", type=float, default=60.0, help="seconds per request")
+    r.add_argument("--max-tokens", type=_positive, default=8,
+                   help="max_tokens sent in the request (default 8, enough for a one-word "
+                        "verdict; raise it for a template that asks for reasoning)")
+    r.add_argument("--system-file", default=None, metavar="PATH",
+                   help="text file with the system message (default: a built-in one asking "
+                        "for 1, 2 or tie)")
+    r.add_argument("--template-file", default=None, metavar="PATH",
+                   help="text file with the user message; {prompt}, {first} and {second} "
+                        "are replaced, other braces must be doubled")
     r.add_argument("--unparsed", default=None, metavar="PATH",
                    help="write replies that held no readable verdict here (JSONL)")
 
@@ -168,12 +178,25 @@ def _cmd_run(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as exc:
         print(f"judgebias: {exc}", file=sys.stderr)
         return 2
+    prompts: dict[str, str] = {}
+    try:
+        if args.system_file:
+            prompts["system"] = Path(args.system_file).read_text(encoding="utf-8")
+        if args.template_file:
+            template = Path(args.template_file).read_text(encoding="utf-8")
+            check_template(template)
+            prompts["template"] = template
+    except (OSError, ValueError) as exc:
+        print(f"judgebias: {exc}", file=sys.stderr)
+        return 2
     judge = HttpJudge(
         base_url=args.base_url,
         model=args.model,
         api_key=os.environ.get(args.api_key_env) or None,
         temperature=args.temperature,
+        max_tokens=args.max_tokens,
         timeout=args.timeout,
+        **prompts,
     )
     orders = ("AB",) if args.one_order else ("AB", "BA")
     counts = {"judged": 0, "unparsed": 0}

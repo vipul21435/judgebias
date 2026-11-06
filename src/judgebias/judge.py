@@ -41,6 +41,22 @@ DEFAULT_TEMPLATE = (
 )
 
 
+def check_template(template: str) -> None:
+    """Raise ValueError unless ``template`` formats with prompt, first and second.
+
+    Each of the three must appear, and no other ``{name}`` may.
+    """
+    for slot in ("{prompt}", "{first}", "{second}"):
+        if slot not in template:
+            raise ValueError(f"template has no {slot}")
+    try:
+        template.format(prompt="", first="", second="")
+    except (KeyError, IndexError, ValueError) as exc:
+        raise ValueError(
+            f"template does not format: {exc!r}; double any literal braces"
+        ) from None
+
+
 @dataclass(frozen=True)
 class Pair:
     """One prompt with two candidate answers to compare."""

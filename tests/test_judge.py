@@ -283,6 +283,37 @@ def test_missing_pair_fields_name_the_line(tmp_path):
         load_pairs(str(pairs))
 
 
+def test_cli_run_passes_prompt_options(tmp_path, capsys, monkeypatch):
+    pairs = tmp_path / "pairs.jsonl"
+    write_jsonl(pairs, [{"pair_id": "p", "prompt": "q", "answer_a": "x", "answer_b": "yy"}])
+    system = tmp_path / "system.txt"
+    system.write_text("Be strict.", encoding="utf-8")
+    template = tmp_path / "template.txt"
+    template.write_text("Q: {prompt}\n1: {first}\n2: {second}\nVerdict?", encoding="utf-8")
+    seen = []
+    monkeypatch.setattr("judgebias.judge.urllib_transport",
+                        lambda url, h, body, t: seen.append(json.loads(body)) or reply("1"))
+    rc = main(["run", str(pairs), "--out", str(tmp_path / "o.jsonl"), "--model", "m",
+               "--one-order", "--max-tokens", "64", "--system-file", str(system),
+               "--template-file", str(template)])
+    assert rc == 0
+    body = seen[0]
+    assert body["max_tokens"] == 64
+    assert body["messages"][0]["content"] == "Be strict."
+    assert body["messages"][1]["content"] == "Q: q\n1: x\n2: yy\nVerdict?"
+
+
+def test_cli_run_refuses_template_without_slots(tmp_path, capsys):
+    pairs = tmp_path / "pairs.jsonl"
+    write_jsonl(pairs, [{"pair_id": "p", "prompt": "q", "answer_a": "x", "answer_b": "yy"}])
+    template = tmp_path / "template.txt"
+    template.write_text("Which is better: {answer}?", encoding="utf-8")
+    rc = main(["run", str(pairs), "--out", str(tmp_path / "o.jsonl"), "--model", "m",
+               "--template-file", str(template)])
+    assert rc == 2
+    assert "template" in capsys.readouterr().err
+
+
 def test_parse_verdict_never_raises_on_random_replies():
     import random
 
