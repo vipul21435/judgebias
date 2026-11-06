@@ -164,7 +164,7 @@ What the numbers say, and no more: on this data GPT-4 agrees with a human as oft
 - Lengths are character counts, not tokens.
 - The bootstrap recomputes every measure in Python for each draw. A 5,000-pair simulated file (10,000 rows, `judgebias simulate big.jsonl --pairs 5000 --seed 3`) took 89 s to audit here at the default 1000 draws; files of tens of thousands of pairs take minutes, and `--reps` trades interval precision for time.
 
-Tests: `uv run pytest -q --cov=judgebias` runs 141 offline tests (fake transports, synthetic judges with known biases, small hand-built MT-Bench rows, malformed input files, and a simulation check of interval coverage) and reports 99 % line coverage of the package.
+Tests: `uv run pytest -q --cov=judgebias` runs 156 offline tests (fake transports, synthetic judges with known biases, small hand-built MT-Bench rows, malformed input files, and a simulation check of interval coverage) and reports 99 % line coverage of the package.
 
 ## Related tools
 
