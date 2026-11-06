@@ -396,3 +396,12 @@ def test_slope_given_human_separates_judge_length_pull():
     assert biased["slope_given_human"]["low"] > 0.5
     plain = [j(f"p{i}", "A", len_a=10 + i, len_b=10) for i in range(5)]
     assert "slope_given_human" not in length_bias(plain, reps=5)
+
+
+def test_render_shortens_long_judge_lists():
+    from judgebias.cli import render
+
+    js = [j(f"p{i}", "A", judge=f"rater_{i}") for i in range(7)]
+    head = render(audit(js, reps=5)).splitlines()[0]
+    assert head.endswith("rater_4, ... (7 in all)")
+    assert "rater_5" not in head

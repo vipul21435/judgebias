@@ -25,7 +25,9 @@ def _fmt(est: dict[str, Any], signed: bool = False) -> str:
 
 
 def render(report: dict[str, Any]) -> str:
-    lines = [f"judgments: {report['n_judgments']}  judges: {', '.join(report['judges'])}"]
+    judges = report["judges"]
+    names = ", ".join(judges[:5]) + (f", ... ({len(judges)} in all)" if len(judges) > 5 else "")
+    lines = [f"judgments: {report['n_judgments']}  judges: {names}"]
     p = report["position"]
     lines.append("position bias")
     if p["n_decided"] + p["n_ties"] or not p.get("n_combined"):
