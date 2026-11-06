@@ -32,15 +32,21 @@ JUDGE_NAME = "gpt-4"
 
 
 def download(dest_dir: str | Path) -> dict[str, Path]:
-    """Fetch both parquet splits into ``dest_dir`` unless already present."""
+    """Fetch both parquet splits into ``dest_dir`` unless already present.
+
+    Each file is written under a ``.part`` name and renamed once complete, so
+    an interrupted download is fetched again on the next call.
+    """
     dest = Path(dest_dir)
     dest.mkdir(parents=True, exist_ok=True)
     out: dict[str, Path] = {}
     for split, url in URLS.items():
         path = dest / f"{split}.parquet"
         if not path.exists():
+            part = path.with_name(path.name + ".part")
             with urllib.request.urlopen(url, timeout=120) as resp:  # noqa: S310
-                path.write_bytes(resp.read())
+                part.write_bytes(resp.read())
+            part.replace(path)
         out[split] = path
     return out
 

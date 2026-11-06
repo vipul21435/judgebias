@@ -253,3 +253,33 @@ def test_missing_pyarrow_hint_points_at_this_repository(monkeypatch):
     assert "git+https://github.com/vipul21435/judgebias" in msg
     assert "pip install 'judgebias[mtbench]'" not in msg
 
+
+def test_interrupted_write_is_fetched_again(tmp_path, monkeypatch):
+    import pathlib
+
+    from judgebias.mtbench import download
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"0123456789"
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda url, timeout=0: Resp())
+    real_write = pathlib.Path.write_bytes
+
+    def disk_full(self, data):
+        real_write(self, data[:4])
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(pathlib.Path, "write_bytes", disk_full)
+    with pytest.raises(OSError):
+        download(tmp_path / "d")
+    assert not (tmp_path / "d" / "human.parquet").exists()
+    monkeypatch.setattr(pathlib.Path, "write_bytes", real_write)
+    paths = download(tmp_path / "d")
+    assert paths["human"].read_bytes() == b"0123456789"
