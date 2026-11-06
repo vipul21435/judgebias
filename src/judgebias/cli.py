@@ -93,12 +93,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("simulate", help="write judgments from a synthetic judge with known biases")
     s.add_argument("path", help="output JSONL file")
-    s.add_argument("--pairs", type=int, default=200)
-    s.add_argument("--position", type=float, default=0.0)
-    s.add_argument("--length", type=float, default=0.0)
-    s.add_argument("--self-pref", type=float, default=0.0)
-    s.add_argument("--repeats", type=int, default=1)
-    s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--pairs", type=int, default=200, help="prompts to simulate (default 200)")
+    s.add_argument("--position", type=float, default=0.0,
+                   help="pull toward the first-shown answer, in score units (default 0)")
+    s.add_argument("--length", type=float, default=0.0,
+                   help="pull per unit of log length ratio toward the longer answer (default 0)")
+    s.add_argument("--self-pref", type=float, default=0.0,
+                   help="pull toward answers from the judge's own family (default 0)")
+    s.add_argument("--repeats", type=int, default=1,
+                   help="samples per pair and order (default 1)")
+    s.add_argument("--seed", type=int, default=0, help="random seed (default 0)")
 
     r = sub.add_parser("run", help="judge pairs through an OpenAI-compatible chat endpoint")
     r.add_argument("path", help="JSONL of pairs: pair_id, prompt, answer_a, answer_b, ...")
@@ -113,7 +117,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--one-order", action="store_true",
                    help="show each pair only as AB instead of both orders")
     r.add_argument("--repeats", type=int, default=1, help="samples per pair and order")
-    r.add_argument("--temperature", type=float, default=0.0)
+    r.add_argument("--temperature", type=float, default=0.0,
+                   help="sampling temperature sent in the request (default 0)")
     r.add_argument("--timeout", type=float, default=60.0, help="seconds per request")
     r.add_argument("--unparsed", default=None, metavar="PATH",
                    help="write replies that held no readable verdict here (JSONL)")
