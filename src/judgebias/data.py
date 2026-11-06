@@ -82,13 +82,20 @@ def _norm_verdict(value: Any) -> str:
 
     Numeric labels are refused: some datasets use 0 for A and 1 for B, while
     run mode and most judge prompts use 1 for the first answer, and a silent
-    choice between the two would swap every verdict in a file.
+    choice between the two would swap every verdict in a file. The slot words
+    ``first`` and ``second`` are refused too: they name the position an answer
+    was shown in, which is A or B depending on ``order``, and reading them as
+    A and B would hide exactly the position bias the audit looks for.
     """
     text = str(value).strip().lower()
-    if text in ("a", "model_a", "first"):
+    if text in ("a", "model_a"):
         return "A"
-    if text in ("b", "model_b", "second"):
+    if text in ("b", "model_b"):
         return "B"
+    if text in ("first", "second"):
+        raise ValueError(
+            f"slot word {value!r} names a position, not an answer; write A, B or tie"
+        )
     if text in ("0", "1", "2", "0.0", "1.0", "2.0"):
         raise ValueError(
             f"numeric verdict {value!r} is ambiguous (0/1 or 1/2 for A/B?); "
