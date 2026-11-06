@@ -14,7 +14,7 @@ A judge scored on prompts shown in one order can look as if it has an opinion ab
 pip install git+https://github.com/vipul21435/judgebias
 ```
 
-Python 3.10 or newer; depends on numpy and scipy. Reading the MT-Bench parquet files needs pyarrow (`pip install pyarrow`, or `pip install "judgebias[mtbench] @ git+https://github.com/vipul21435/judgebias"`). The package named judgebias on PyPI is a different project, not this one; install from GitHub as above. Nothing needs an API key or the network except the optional `run` and `mtbench` commands.
+Python 3.10 or newer; depends on numpy and scipy. Reading the MT-Bench parquet files needs pyarrow (`pip install pyarrow`, or `pip install "judgebias[mtbench] @ git+https://github.com/vipul21435/judgebias"`). The package named judgebias on PyPI is a different project, not this one; install from GitHub as above. Nothing needs an API key or the network except the optional `run`, `mtbench` and `alpaca` commands.
 
 ## Quickstart
 
@@ -154,17 +154,74 @@ Human judges, single-order measures (`humans.jsonl`, 3,355 verdicts): first-posi
 
 What the numbers say, and no more: on this data GPT-4 agrees with a human as often as two humans agree with each other, or slightly more often, under both tie setups (the intervals overlap). It changes its verdict with the order on about one pair in six. It favours longer answers more than the humans do, but after adjusting for the human label the remaining length pull overlaps with the same figure for one human against another. It picks answers from `gpt` models about six points more often than the humans did, and that interval excludes zero.
 
+### A second dataset: AlpacaFarm and AlpacaEval
+
+Data: public preference files from the AlpacaFarm and AlpacaEval projects, released with the paper [AlpacaFarm: A Simulation Framework for Methods that Learn from Human Feedback](https://arxiv.org/abs/2305.14387) (Dubois et al., NeurIPS 2023) and on Hugging Face as [tatsu-lab/alpaca_farm](https://huggingface.co/datasets/tatsu-lab/alpaca_farm) and [tatsu-lab/alpaca_eval](https://huggingface.co/datasets/tatsu-lab/alpaca_eval). Both dataset pages list the licence as CC BY-NC 4.0 (non-commercial use only), and the [AlpacaFarm repository](https://github.com/tatsu-lab/alpaca_farm) states the same for its data; the code of [AlpacaEval](https://github.com/tatsu-lab/alpaca_eval) and AlpacaFarm is Apache 2.0 (all checked on those pages). No data from these files is stored in this repository; `judgebias alpaca` downloads the five JSON files (60 MB) into the folder you name and prints the rows it read from each. The files used:
+
+- `alpaca_human_preference` (9,691 pairs of outputs to one instruction, one human label each) and `alpaca_gpt4_preference` (19,472 labels by a GPT-4 judge). 9,537 of the human-labelled pairs also have a GPT-4 label.
+- `alpaca_farm_human_crossannotations`: 2,596 human labels on 648 pairs, about four per pair, by 16 annotators named by index. 190 of these pairs also have a GPT-4 label.
+- `alpaca_eval_annotations_alpaca_eval_gpt4` and `alpaca_eval_annotations_claude`: verdicts of a GPT-4 judge and a Claude judge on the same 10,465 AlpacaEval pairs, each the answer of one of several models against the `text_davinci_003` baseline. These have no human labels. Pairs with identical outputs carry no verdict; they and rows without a verdict are left out (1,822 rows over the two files, as the command prints), and 9,553 pairs have a verdict from both judges.
+
+None of the converted files contains a tie, so the ties-dropped agreement equals the ties-kept one and only one is given. Commands (the largest audit, `farm_gpt4.jsonl`, took about a minute here):
+
+```
+judgebias alpaca --data-dir alp --farm-judge farm_gpt4.jsonl --cross-judge cross_gpt4.jsonl \
+    --human-pairs cross_humans.jsonl --eval-judges eval_judges.jsonl \
+    --eval-claude-vs-gpt4 claude_vs_gpt4.jsonl --eval-gpt4-vs-claude gpt4_vs_claude.jsonl
+judgebias audit farm_gpt4.jsonl
+judgebias audit cross_gpt4.jsonl
+judgebias audit cross_humans.jsonl
+judgebias audit gpt4_vs_claude.jsonl --family alpaca_eval_gpt4=gpt --family gpt4=gpt --family chatgpt=gpt
+judgebias audit claude_vs_gpt4.jsonl
+```
+
+`claude_vs_gpt4.jsonl` holds the Claude verdict as `verdict` and the GPT-4 verdict on the same pair in the `human` field, and `gpt4_vs_claude.jsonl` the other way round: with no human labels, the "agreement" and "excess" lines of these audits compare one judge with the other. `eval_judges.jsonl` holds both judges' verdicts; `judgebias audit eval_judges.jsonl --judge claude` gives the Claude figures on its 9,555 pairs, with point estimates within 0.001 of those below.
+
+Position bias. None of the files records the order in which a judge saw the two outputs, so this data gives no first-position rate: the converter writes the stored order, and an audit's first-position line on these files describes `output_1`, which in AlpacaEval is always the baseline. The one exception is small: some pairs appear in the AlpacaFarm GPT-4 file with the two outputs stored both ways round, 19 of them with a human label (`both orders, same judge: 19` in the first audit). Taking the stored order as the shown order, GPT-4 changed its verdict on 0.632 [0.385, 0.857] of those 19, and 0.667 [0.333, 0.938] of the changes went to the first slot both times. The files do not say that the two rows are separate judgments in opposite orders, so this is not a flip rate to set beside MT-Bench's.
+
+AlpacaFarm, GPT-4 against human labels:
+
+| Measure | GPT-4 vs the human label (9,537 pairs, 9,556 rows) | GPT-4 vs each cross-annotator (190 pairs, 760 rows) | One cross-annotator against another (648 pairs, 3,905 rows) |
+|---|---|---|---|
+| Longer-answer win rate | 0.568 [0.558, 0.578] | 0.538 [0.465, 0.606] | 0.571 [0.544, 0.597] |
+| Length slope, raw | 0.410 [0.342, 0.481] | 0.541 [0.102, 1.129] | 0.474 [0.332, 0.642] |
+| Length slope, given the other label | 0.331 [0.261, 0.402] | 0.421 [0.003, 0.988] | 0.425 [0.286, 0.574] |
+| Raw agreement | 0.618 [0.608, 0.628] | 0.612 [0.566, 0.654] | 0.618 [0.598, 0.638] |
+| Cohen's kappa | 0.236 [0.217, 0.256] | 0.220 [0.128, 0.306] | 0.235 [0.195, 0.275] |
+
+In the last column the length figures are those of the annotator in the `verdict` field, so they describe human annotators, not GPT-4.
+
+AlpacaEval, two judges on the same 9,553 pairs:
+
+| Measure | GPT-4 judge | Claude judge |
+|---|---|---|
+| Longer-answer win rate | 0.747 [0.738, 0.755] | 0.647 [0.638, 0.655] |
+| Length slope, raw | 1.037 [0.956, 1.119] | 0.368 [0.321, 0.415] |
+| Length slope, given the other judge's verdict | 0.887 [0.813, 0.956] | 0.001 [-0.046, 0.049] |
+| Own-family win rate (answers from `gpt4` and `chatgpt` for GPT-4, from `claude` for Claude) | 0.911 [0.897, 0.925] | 0.761 [0.731, 0.791] |
+| Same rows, the other judge | 0.726 [0.704, 0.747] | 0.888 [0.867, 0.909] |
+| Difference | +0.185 [+0.164, +0.209] | -0.127 [-0.160, -0.093] |
+
+Agreement between the two judges: raw 0.741 [0.733, 0.750], kappa 0.476 [0.459, 0.493]. The `--family` flags put AlpacaEval's GPT-4 judge and the `gpt4` and `chatgpt` answers in one family; the `text_davinci_003` baseline, also an OpenAI model, is left outside it, so the GPT-4 row measures how often GPT-4 and ChatGPT answers beat the baseline. For Claude the name rule alone puts the judge `claude` and the answers of `claude` in one family.
+
+![Share of decided verdicts for answer A against the log length ratio, AlpacaEval GPT-4 and Claude judges, with logistic fits](docs/alpacaeval_length_bias.png)
+
+`docs/alpacaeval_length_bias.png`, made with `uv run --with matplotlib python examples/plot_length_bias.py gpt4_vs_claude.jsonl claude_vs_gpt4.jsonl docs/alpacaeval_length_bias.png --labels "GPT-4 judge" "Claude judge" --title "AlpacaEval pairs: verdict against answer length"`. Answer A is the baseline in every pair. The binned shares bend away from the logistic curves at both ends, so a single slope summarises the length pull only roughly here.
+
+Against the MT-Bench results above. Agreement: on MT-Bench GPT-4 agreed with a human (kappa 0.48 with ties, 0.71 without) as often as one human agreed with another; on AlpacaFarm the same parity holds, at a much lower level: GPT-4 against a human label and one human against another both give raw agreement 0.61 to 0.62 and kappa 0.22 to 0.24, with overlapping intervals. The low level holds for humans too, so it describes these pairs as much as the judge. Length: on MT-Bench GPT-4's raw slope (0.93) was higher than the human-human figure (0.79), with overlapping intervals; on AlpacaFarm GPT-4's slope (0.41) lies inside the human-human interval, and on AlpacaEval it is 1.04, close to its MT-Bench value, while the Claude judge's is 0.37 and drops to 0.00 given GPT-4's verdict, against 0.89 for GPT-4 given Claude's. So a judge's length pull depends on the judge and on the data, and one dataset does not settle it. Self-preference: on MT-Bench GPT-4 picked `gpt` answers 5.7 points more often than humans did; on AlpacaEval it picks GPT-4 and ChatGPT answers 18.5 points more often than the Claude judge does, while the Claude judge picks Claude's answers 12.7 points less often than GPT-4 does. Without human labels on AlpacaEval this cannot say which judge is closer to people, only that the two disagree most where one of them is judging its own family. Position bias could not be checked on the second dataset.
+
 ## Limitations
 
 - Position and length bias are measured on the judge's verdicts alone. The human-adjusted slope separates a judge's taste for length from quality only as far as the human labels measure quality, and the logistic fits have no other covariates (model identity, question category, turn).
 - The MT-Bench GPT-4 split publishes only verdicts that already combine both orders, so its first-position win rate cannot be computed from it; only the share of order-inconsistent verdicts can. The human split's first-position figures assume `model_a` was shown first.
+- The AlpacaFarm and AlpacaEval files do not record the order in which a judge saw the outputs, so the second dataset adds no position-bias evidence beyond 19 AlpacaFarm pairs of uncertain standing. The AlpacaEval files have no human labels: their self-preference and length figures compare GPT-4 with Claude, not either judge with people. The converter matches pairs across files on their exact texts, so a pair whose text differs by a character between files is not matched.
 - Self-preference uses a name-prefix family rule, which is wrong for models whose names do not start with their family (use `--family` for those), and it cannot tell a judge's taste for its own family from real quality differences that humans missed.
 - Intervals are percentile bootstrap intervals over prompts; for very small samples or rates near 0 or 1 they under-cover. A seeded simulation (`uv run python examples/bootstrap_coverage.py`, 200 datasets per setting, 400 draws each, 77 s here) puts the coverage of the 95 % intervals at: first-position rate 0.945 for 60 prompts at a true rate of 0.60, 0.930 for 30 prompts at 0.85 and 0.945 for 200 prompts at 0.65; Cohen's kappa (three labels, true kappa 0.568) 0.930 at 40 prompts and 0.935 at 150; length slope (true slope 1.0) 0.915 at 40 prompts and 0.940 at 150. The test suite checks the first two first-position settings stay between 0.90 and 0.98. No correction for multiple comparisons is applied across the measures.
 - The run mode has been tried here against the local stub server only, not against a hosted model. It sends one request per pair, order and repeat with no retries, rate limiting or concurrency. Its reply parser is a set of fixed patterns, not a model, tried in order: a reply that is only `1`, `2`, `A`, `B`, `first`, `second` or `tie`; an MT-Bench style `[[A]]` / `[[B]]` / `[[C]]` marker; a labelled verdict such as `Answer: B` or `Verdict: 1`; and otherwise any of `Response A` and the like, a stated pick (`I choose B`), a claim (`A is better`, `2 wins`), the words `first`, `second` and `tie`, and, in a reply of at most three words, a bare `1` or `2` that is not part of a score such as `2/10`. Letters are read only in upper case outside markers, since `a` is also the article. A reply that names both slots or none is counted as unparsed and left out, not guessed. Negation is understood only in the stated-pick form (`I would not pick 1` is unparsed); a judge that argues at length before naming its pick, or names the answers some other way, will give many unparsed replies, so check the count before reading the audit.
 - Lengths are character counts, not tokens.
 - The bootstrap recomputes every measure in Python for each draw. A 5,000-pair simulated file (10,000 rows, `judgebias simulate big.jsonl --pairs 5000 --seed 3`) took 89 s to audit here at the default 1000 draws; files of tens of thousands of pairs take minutes, and `--reps` trades interval precision for time.
 
-Tests: `uv run pytest -q --cov=judgebias` runs 156 offline tests (fake transports, synthetic judges with known biases, small hand-built MT-Bench rows, malformed input files, and a simulation check of interval coverage) and reports 99 % line coverage of the package.
+Tests: `uv run pytest -q --cov=judgebias` runs 182 offline tests (fake transports, synthetic judges with known biases, small hand-built MT-Bench, AlpacaFarm and AlpacaEval rows, malformed input files, and a simulation check of interval coverage) and reports 99 % line coverage of the package.
 
 ## Related tools
 
@@ -176,6 +233,6 @@ Tests: `uv run pytest -q --cov=judgebias` runs 156 offline tests (fake transport
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The MT-Bench data used in the results section is CC BY 4.0 and is not redistributed here.
+MIT, see [LICENSE](LICENSE). The MT-Bench data used in the results section is CC BY 4.0, and the AlpacaFarm and AlpacaEval data CC BY-NC 4.0; neither is redistributed here.
 
 Built by Vipul Raj Jha · https://vipul21435.github.io

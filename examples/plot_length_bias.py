@@ -54,6 +54,7 @@ def main() -> None:
     ap.add_argument("out")
     ap.add_argument("--labels", nargs=2, default=("first", "second"))
     ap.add_argument("--bins", type=int, default=8)
+    ap.add_argument("--title", default="MT-Bench pairs: verdict against answer length")
     args = ap.parse_args()
 
     fig, ax = plt.subplots(figsize=(7.2, 4.4), dpi=150)
@@ -88,7 +89,7 @@ def main() -> None:
     ax.set_ylim(0, 1)
     ax.set_xlabel("log((len A + 1) / (len B + 1)), characters", color=INK)
     ax.set_ylabel("share of decided verdicts for A", color=INK)
-    ax.set_title("MT-Bench pairs: verdict against answer length", color=INK, loc="left")
+    ax.set_title(args.title, color=INK, loc="left")
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
     for side in ("left", "bottom"):
