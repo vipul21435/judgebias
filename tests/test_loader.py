@@ -106,3 +106,11 @@ def test_lengths_must_be_non_negative_whole_numbers(value):
 def test_whole_number_lengths_in_other_spellings_are_read():
     j = judgment_from_dict({"pair_id": "p1", "verdict": "A", "len_a": 4.0, "len_b": "7"})
     assert (j.len_a, j.len_b) == (4, 7)
+
+
+def test_label_is_not_read_as_the_judge_verdict():
+    # many preference datasets use "label" for the human label
+    with pytest.raises(ValueError, match="no verdict"):
+        judgment_from_dict({"pair_id": "p1", "label": "A"})
+    j = judgment_from_dict({"pair_id": "p1", "verdict": "B", "label": "A"})
+    assert j.verdict == "B" and j.extra == {"label": "A"}

@@ -78,7 +78,7 @@ class Judgment:
 
 _ALIASES = {
     "pair_id": ("pair_id", "id", "question_id"),
-    "verdict": ("verdict", "winner", "label"),
+    "verdict": ("verdict", "winner"),
     "order": ("order",),
     "judge": ("judge",),
     "len_a": ("len_a", "length_a"),
