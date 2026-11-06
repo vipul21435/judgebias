@@ -16,11 +16,12 @@ from .measures import audit
 from .synth import simulate, to_rows
 
 
-def _fmt(est: dict[str, Any]) -> str:
+def _fmt(est: dict[str, Any], signed: bool = False) -> str:
     v = est["value"]
     if isinstance(v, float) and math.isnan(v):
         return "n/a"
-    return f"{v:.3f} [{est['low']:.3f}, {est['high']:.3f}] n={est['n']}"
+    f = "+.3f" if signed else ".3f"
+    return f"{v:{f}} [{est['low']:{f}}, {est['high']:{f}}] n={est['n']}"
 
 
 def render(report: dict[str, Any]) -> str:
@@ -52,7 +53,7 @@ def render(report: dict[str, Any]) -> str:
         lines.append(f"  own-family win rate      {_fmt(s['own_win_rate'])}")
         if "own_win_rate_human" in s:
             lines.append(f"  same, by human labels    {_fmt(s['own_win_rate_human'])}")
-            lines.append(f"  excess                   {s['excess']:+.3f}")
+            lines.append(f"  excess                   {_fmt(s['excess'], signed=True)}")
     if "agreement" in report:
         a = report["agreement"]
         lines.append(f"agreement with humans (ties={a['ties']}, labelled {a['n_labelled']})")

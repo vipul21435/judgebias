@@ -185,7 +185,7 @@ def test_self_preference_counts_only_mixed_pairs():
     assert s["n_used"] == 2
     assert s["own_win_rate"]["value"] == 1.0
     assert s["own_win_rate_human"]["value"] == 0.5
-    assert s["excess"] == pytest.approx(0.5)
+    assert s["excess"]["value"] == pytest.approx(0.5)
 
 
 # --- agreement -------------------------------------------------------------
@@ -273,8 +273,9 @@ def test_simulated_length_bias_is_detected():
 def test_simulated_self_preference_is_detected():
     fair = self_preference(simulate(400, self_pref=0.0, seed=7), reps=100)
     biased = self_preference(simulate(400, self_pref=2.0, seed=7), reps=100)
-    assert abs(fair["excess"]) < 0.15
-    assert biased["excess"] > 0.3
+    assert abs(fair["excess"]["value"]) < 0.1
+    assert fair["excess"]["low"] < fair["excess"]["value"] < fair["excess"]["high"]
+    assert biased["excess"]["low"] > 0.2
 
 
 def test_audit_omits_sections_without_data():

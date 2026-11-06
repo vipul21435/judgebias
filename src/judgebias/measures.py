@@ -226,7 +226,10 @@ def self_preference(
     ``/`` (``judge="gpt-4"`` and ``model_a="gpt-3.5"`` share family ``gpt``).
     ``own_win_rate`` above the judge's overall win rate for that family on
     human labels suggests self-preference; the human comparison is only
-    reported when human labels exist.
+    reported when human labels exist, together with ``excess``: the judge's
+    rate minus the human rate, with a bootstrap interval over prompts in
+    which both rates are recomputed on the same resample. Each rate leaves
+    out its own ties.
     """
     groups = _by_pair(judgments)
 
@@ -265,7 +268,9 @@ def self_preference(
         out["own_win_rate_human"] = bootstrap(
             groups, lambda g: own(g, True), reps=reps, seed=seed
         ).as_dict()
-        out["excess"] = out["own_win_rate"]["value"] - out["own_win_rate_human"]["value"]
+        out["excess"] = bootstrap(
+            groups, lambda g: own(g, False) - own(g, True), reps=reps, seed=seed
+        ).as_dict()
     return out
 
 
