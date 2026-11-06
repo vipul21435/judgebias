@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- The self-preference family rule reads the last `/` component of a name, so vendor or
+  router prefixes such as `openai/gpt-4o` no longer hide the measure; `audit --family
+  NAME=FAMILY` sets a family by hand, and the audit prints the judge and candidate
+  families when no row pits one against the other.
+- When every row was shown in one order, the audit notes that the first-position win rate
+  is also the win rate of A (`one_order` in the report).
+- `audit --json` writes n/a values as `null`, so the output is strict JSON.
+- `second_both_rate` reports the flips that took the second slot both times; flips that
+  involve a tie count as neither.
+- Tests for tie and equal-length rows, zero-length answers, repeat grouping by judge and
+  the one-class guard of the adjusted slope.
 - Flip rate and first-both share compare an AB sample only with the BA sample of the same
   judge and repeat; files with several judges no longer show flips between judges.
   `judgebias audit --judge NAME` keeps one judge's rows.
