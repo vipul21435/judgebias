@@ -318,6 +318,8 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "pyarrow", version = "25.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pyarrow", version = "26.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -330,6 +332,7 @@ mtbench = [
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=1.24" },
+    { name = "pyarrow", marker = "extra == 'dev'", specifier = ">=14" },
     { name = "pyarrow", marker = "extra == 'mtbench'", specifier = ">=14" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5" },

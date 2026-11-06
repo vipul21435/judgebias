@@ -332,7 +332,11 @@ def audit(
     reps: int = 1000,
     seed: int = 0,
 ) -> dict[str, Any]:
-    """Run every measure that the data supports."""
+    """Run every measure that the data supports.
+
+    Self-preference is reported only when some judgment pits the judge's own
+    family against another; it is omitted otherwise.
+    """
     out: dict[str, Any] = {
         "n_judgments": len(judgments),
         "judges": sorted({j.judge for j in judgments}),
@@ -342,7 +346,9 @@ def audit(
     if any(j.len_a is not None and j.len_b is not None for j in judgments):
         out["length"] = length_bias(judgments, reps=reps, seed=seed)
     if any(j.model_a is not None and j.model_b is not None for j in judgments):
-        out["self_preference"] = self_preference(judgments, reps=reps, seed=seed)
+        sp = self_preference(judgments, reps=reps, seed=seed)
+        if sp["n_used"]:
+            out["self_preference"] = sp
     if any(j.human is not None for j in judgments):
         out["agreement"] = agreement(judgments, ties=ties, reps=reps, seed=seed)
     return out
