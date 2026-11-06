@@ -29,7 +29,7 @@ $ judgebias audit examples/synthetic_judge.jsonl
 judgments: 120  judges: gamma-70b
 position bias
   first-position win rate  0.647 [0.592, 0.706] n=60  (decided 119, ties 1)
-  flip rate under swap     0.300 [0.183, 0.417] n=60  (pairs with both orders 60)
+  flip rate under swap     0.300 [0.183, 0.417] n=60  (both orders, same judge: 60)
   first-both among flips   0.944 [0.812, 1.000] n=60
 length bias
   longer-answer win rate   0.748 [0.664, 0.831] n=60
@@ -72,7 +72,7 @@ $ judgebias audit judged.jsonl
 judgments: 24  judges: stub
 position bias
   first-position win rate  0.750 [0.583, 0.875] n=12  (decided 24, ties 0)
-  flip rate under swap     0.500 [0.167, 0.750] n=12  (pairs with both orders 12)
+  flip rate under swap     0.500 [0.167, 0.750] n=12  (both orders, same judge: 12)
   first-both among flips   1.000 [1.000, 1.000] n=12
 length bias
   longer-answer win rate   0.800 [0.636, 0.950] n=12
@@ -89,7 +89,7 @@ Every flip is a first-slot flip, which is how the stub was built; with 12 pairs 
 
 Every interval resamples prompts (`pair_id`), not rows, so both presentation orders, repeated samples and several human labels of one pair stay together in each bootstrap draw. Intervals are percentile intervals from 1000 draws by default.
 
-- **Position bias.** `first_win_rate` is the share of decided verdicts that went to the answer shown first; 0.5 is unbiased. `flip_rate` is, over pairs judged in both orders, the share whose verdict changed with the order. `first_both_rate` is, among flipped pairs, the share where the judge took the first slot both times rather than the second. Showing every pair in both orders and calling an order-dependent verdict a tie is the conservative fix described in the MT-Bench paper (Zheng et al., 2023, section 3.4); some datasets publish only that combined verdict, with a flag for the pairs whose two orders disagreed. Rows with `flipped` set are such combined verdicts: they are left out of the three single-order measures and give `combined_flip_rate`, the share flagged.
+- **Position bias.** `first_win_rate` is the share of decided verdicts that went to the answer shown first; 0.5 is unbiased. `flip_rate` is, over pairs judged in both orders by the same judge, the share whose verdict changed with the order; an AB sample is only ever compared with the BA sample of the same judge and repeat, so a file with several judges that disagree with each other shows no false flips. `audit --judge NAME` keeps one judge's rows (repeat the flag to keep several). `first_both_rate` is, among flipped pairs, the share where the judge took the first slot both times rather than the second. Showing every pair in both orders and calling an order-dependent verdict a tie is the conservative fix described in the MT-Bench paper (Zheng et al., 2023, section 3.4); some datasets publish only that combined verdict, with a flag for the pairs whose two orders disagreed. Rows with `flipped` set are such combined verdicts: they are left out of the three single-order measures and give `combined_flip_rate`, the share flagged.
 - **Length bias.** `longer_win_rate` is the share of decided verdicts with unequal lengths that went to the longer answer. `slope` is b in the logistic fit P(A wins) = sigmoid(a + b x) with x = log((len_a + 1) / (len_b + 1)), fitted by L-BFGS on the log-likelihood with an L2 weight of 1e-4 on b, so separable data gives a finite number. b = 0 means length does not move the verdict. Because better answers are often longer, the raw slope mixes a judge's taste for length with real quality. When human labels exist, `slope_given_human` refits with the human label (+1 for A, -1 for B) as a second covariate on rows where neither side tied: what remains is how much length moves the judge beyond what it moves the human. A human label is a noisy measure of quality, so part of that remainder is noise in the covariate; compare it with the same number for one human against another (the `--human-pairs` file below) rather than with zero.
 - **Self-preference.** A model's family is its name up to the first `-`, `/`, `_` or `:`. On judgments where exactly one candidate shares the judge's family, `own_win_rate` is how often the judge picked that candidate and `own_win_rate_human` how often the human label did, each over its own decided rows; `excess` is the difference, with an interval in which both rates are recomputed on the same resample. A positive excess means the judge favours its own family beyond what the humans saw on the same pairs, the "self-enhancement" effect discussed in section 3.3 of the MT-Bench paper.
 - **Agreement.** Raw agreement and Cohen's kappa, (p_o - p_e) / (1 - p_e) over the full confusion table, between judge and human labels. With `--ties keep`, tie is a third category on both sides (the paper's setup S1, which counts an order-inconsistent verdict as a tie); with `--ties drop`, any row where either side said tie is removed (setup S2). The number of rows each setup keeps is printed, so a high S2 figure on few rows is visible as such.
@@ -141,7 +141,7 @@ Check against the paper. Restricted to first-turn votes by the judges named `exp
 | Human vs human, S1 | 0.630 [0.579, 0.679], 721 rows | 63 %, 721 votes |
 | Human vs human, S2 | 0.810 [0.760, 0.853], 479 rows | 81 %, 479 votes |
 
-Human judges, single-order measures (`humans.jsonl`, 3,355 verdicts): first-position win rate 0.502 [0.484, 0.521]; longer-answer win rate 0.694 [0.669, 0.717]; length slope 0.700 [0.593, 0.823]. This takes `model_a` in each row as the answer shown first, which neither the dataset card nor the paper states. The flip rate on this file, 0.342 [0.305, 0.383] over 582 pairs, compares two different people who saw the pair in opposite orders, so it is mostly ordinary disagreement between people: one human against another disagrees on 0.345 of rows (1 - 0.655) whatever the order.
+Human judges, single-order measures (`humans.jsonl`, 3,355 verdicts): first-position win rate 0.502 [0.484, 0.521]; longer-answer win rate 0.694 [0.669, 0.717]; length slope 0.700 [0.593, 0.823]. This takes `model_a` in each row as the answer shown first, which neither the dataset card nor the paper states. No flip rate can be read from this file: a flip compares one judge with itself in both orders, and the file has just one pair that the same human judged in both orders (`both orders, same judge: 1`). Two different people who saw a pair in opposite orders disagree for ordinary reasons; one human against another disagrees on 0.345 of rows (1 - 0.655) whatever the order.
 
 What the numbers say, and no more: on this data GPT-4 agrees with a human as often as two humans agree with each other, or slightly more often, under both tie setups (the intervals overlap). It changes its verdict with the order on about one pair in six. It favours longer answers more than the humans do, but after adjusting for the human label the remaining length pull overlaps with the same figure for one human against another. It picks answers from `gpt` models about six points more often than the humans did, and that interval excludes zero.
 

@@ -105,6 +105,60 @@ def test_position_bias_without_swaps():
     assert p["n_ties"] == 1
 
 
+def test_flips_pair_samples_of_the_same_judge_only():
+    # judges x and y never flip on their own but always disagree with each other;
+    # rows interleaved so that the first AB row and the first BA row differ in judge
+    js = []
+    for i in range(20):
+        js += [
+            j(f"p{i}", "A", "AB", judge="x"),
+            j(f"p{i}", "B", "AB", judge="y"),
+            j(f"p{i}", "B", "BA", judge="y"),
+            j(f"p{i}", "A", "BA", judge="x"),
+        ]
+    p = position_bias(js, reps=30)
+    assert p["flip_rate"]["value"] == 0.0
+    assert p["n_pairs_both_orders"] == 40
+    assert math.isnan(p["first_both_rate"]["value"])
+    # a judge seen in only one order by itself gives no flip unit
+    lone = [j("q", "A", "AB", judge="x"), j("q", "B", "BA", judge="y")]
+    assert position_bias(lone, reps=5)["n_pairs_both_orders"] == 0
+
+
+def test_flips_match_repeats():
+    # repeat 0 says A in both orders, repeat 1 says B in both orders: no flips
+    js = []
+    for i in range(10):
+        for rep, v in ((0, "A"), (1, "B")):
+            js += [j(f"p{i}", v, "AB", repeat=rep)]
+        for rep, v in ((1, "B"), (0, "A")):
+            js += [j(f"p{i}", v, "BA", repeat=rep)]
+    p = position_bias(js, reps=10)
+    assert p["flip_rate"]["value"] == 0.0
+    assert p["n_pairs_both_orders"] == 20
+
+
+def test_cli_judge_filter(tmp_path, capsys):
+    path = tmp_path / "two.jsonl"
+    rows = []
+    for i in range(10):
+        rows += [
+            {"pair_id": f"p{i}", "verdict": "A", "order": "AB", "judge": "x"},
+            {"pair_id": f"p{i}", "verdict": "B", "order": "BA", "judge": "x"},
+            {"pair_id": f"p{i}", "verdict": "A", "order": "AB", "judge": "y"},
+            {"pair_id": f"p{i}", "verdict": "A", "order": "BA", "judge": "y"},
+        ]
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    assert main(["audit", str(path), "--reps", "10", "--judge", "x", "--json"]) == 0
+    rep = json.loads(capsys.readouterr().out)
+    assert rep["judges"] == ["x"] and rep["position"]["flip_rate"]["value"] == 1.0
+    assert main(["audit", str(path), "--reps", "10", "--judge", "y", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["position"]["flip_rate"]["value"] == 0.0
+    assert main(["audit", str(path), "--reps", "10", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["position"]["flip_rate"]["value"] == 0.5
+    assert main(["audit", str(path), "--judge", "nobody"]) == 2
+
+
 # --- length ----------------------------------------------------------------
 
 
@@ -413,3 +467,13 @@ def test_render_shortens_long_judge_lists():
     head = render(audit(js, reps=5)).splitlines()[0]
     assert head.endswith("rater_4, ... (7 in all)")
     assert "rater_5" not in head
+
+
+def test_self_preference_matches_each_row_to_its_own_judge():
+    js = [
+        j("p1", "A", judge="gpt-4", model_a="gpt-3.5", model_b="claude-2"),
+        j("p2", "B", judge="claude-2", model_a="gpt-3.5", model_b="claude-1"),
+    ]
+    sp = self_preference(js, reps=5)
+    assert sp["judge_family"] == "claude, gpt"
+    assert sp["n_used"] == 2 and sp["own_win_rate"]["value"] == 1.0

@@ -37,7 +37,7 @@ def render(report: dict[str, Any]) -> str:
         )
         lines.append(
             f"  flip rate under swap     {_fmt(p['flip_rate'])}"
-            f"  (pairs with both orders {p['n_pairs_both_orders']})"
+            f"  (both orders, same judge: {p['n_pairs_both_orders']})"
         )
         lines.append(f"  first-both among flips   {_fmt(p['first_both_rate'])}")
     if "combined_flip_rate" in p:
@@ -54,7 +54,9 @@ def render(report: dict[str, Any]) -> str:
             lines.append(f"  same, given human label  {_fmt(ln['slope_given_human'])}")
     if "self_preference" in report:
         s = report["self_preference"]
-        lines.append(f"self-preference (judge family {s['judge_family']})")
+        fams = s["judge_family"] or ""
+        word = "families" if "," in fams else "family"
+        lines.append(f"self-preference (judge {word} {fams})")
         lines.append(f"  own-family win rate      {_fmt(s['own_win_rate'])}")
         if "own_win_rate_human" in s:
             lines.append(f"  same, by human labels    {_fmt(s['own_win_rate_human'])}")
@@ -86,6 +88,8 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--reps", type=int, default=1000, help="bootstrap resamples (default 1000)")
     a.add_argument("--seed", type=int, default=0, help="bootstrap seed (default 0)")
     a.add_argument("--json", action="store_true", help="print the full report as JSON")
+    a.add_argument("--judge", action="append", default=None, metavar="NAME",
+                   help="audit only rows by this judge; repeat to keep several")
 
     s = sub.add_parser("simulate", help="write judgments from a synthetic judge with known biases")
     s.add_argument("path", help="output JSONL file")
@@ -220,6 +224,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, ValueError) as exc:
         print(f"judgebias: {exc}", file=sys.stderr)
         return 2
+    if args.judge:
+        judgments = [j for j in judgments if j.judge in set(args.judge)]
     if not judgments:
         print("judgebias: no judgments found", file=sys.stderr)
         return 2

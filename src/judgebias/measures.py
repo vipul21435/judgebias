@@ -67,34 +67,38 @@ def _combined_flip_rate(groups: Sequence[Sequence[Judgment]]) -> float:
     return _nan_if_empty(sum(flags), len(flags))
 
 
-def _flip_rate(groups: Sequence[Sequence[Judgment]]) -> float:
-    """Share of pairs judged in both orders whose verdict changed with the order."""
-    flips = 0
-    both = 0
-    for g in groups:
-        ab = [j.verdict for j in g if j.order == "AB" and j.flipped is None]
-        ba = [j.verdict for j in g if j.order == "BA" and j.flipped is None]
-        if not ab or not ba:
+def _swap_units(g: Sequence[Judgment]) -> list[tuple[Judgment, Judgment]]:
+    """The (AB, BA) verdict pairs of one prompt, matched by judge and repeat.
+
+    A flip compares one judge with itself: the AB sample of a given judge and
+    repeat is set against the BA sample of the same judge and repeat. Rows by
+    different judges, or different repeats, are never compared, so a file
+    with several judges that disagree with each other shows no false flips.
+    """
+    ab: dict[tuple[str, int], Judgment] = {}
+    ba: dict[tuple[str, int], Judgment] = {}
+    for j in g:
+        if j.flipped is not None:
             continue
-        both += 1
-        if ab[0] != ba[0]:
-            flips += 1
-    return _nan_if_empty(flips, both)
+        side = ab if j.order == "AB" else ba
+        side.setdefault((j.judge, j.repeat), j)
+    return [(ab[k], ba[k]) for k in ab if k in ba]
+
+
+def _flip_rate(groups: Sequence[Sequence[Judgment]]) -> float:
+    """Share of (pair, judge, repeat) units seen in both orders whose verdict changed."""
+    units = [u for g in groups for u in _swap_units(g)]
+    flips = sum(a.verdict != b.verdict for a, b in units)
+    return _nan_if_empty(flips, len(units))
 
 
 def _consistent_first_rate(groups: Sequence[Sequence[Judgment]]) -> float:
-    """Among flipped pairs, the share where the judge took the first answer both times."""
-    first_both = 0
-    flipped = 0
-    for g in groups:
-        ab = [j for j in g if j.order == "AB" and j.flipped is None]
-        ba = [j for j in g if j.order == "BA" and j.flipped is None]
-        if not ab or not ba or ab[0].verdict == ba[0].verdict:
-            continue
-        flipped += 1
-        if ab[0].picked_first and ba[0].picked_first:
-            first_both += 1
-    return _nan_if_empty(first_both, flipped)
+    """Among flipped units, the share where the judge took the first answer both times."""
+    flipped = [
+        (a, b) for g in groups for a, b in _swap_units(g) if a.verdict != b.verdict
+    ]
+    first_both = sum(bool(a.picked_first and b.picked_first) for a, b in flipped)
+    return _nan_if_empty(first_both, len(flipped))
 
 
 def position_bias(
@@ -104,8 +108,12 @@ def position_bias(
 
     ``first_win_rate`` is the share of decided verdicts that picked whichever
     answer was shown first; 0.5 is unbiased. ``flip_rate`` needs pairs judged
-    in both orders: the share whose verdict changed when the order changed.
-    ``first_both_rate`` is, among flipped pairs, the share where the judge
+    in both orders by the same judge: over (pair, judge, repeat) units with an
+    AB and a BA sample, the share whose verdict changed when the order
+    changed. ``n_pairs_both_orders`` counts those units (one per pair when
+    there is one judge and no repeats). Verdicts by different judges are never
+    compared with each other. ``first_both_rate`` is, among flipped units, the
+    share where the judge
     chose the first-shown answer both times (a pure position preference) as
     opposed to the second both times. Rows whose verdict already combines both
     orders (``flipped`` set) are left out of those three and give
@@ -117,12 +125,7 @@ def position_bias(
     groups = _by_pair(judgments)
     single = [j for j in judgments if j.flipped is None]
     picks = [j.picked_first for j in single]
-    both = sum(
-        1
-        for g in groups
-        if any(j.order == "AB" and j.flipped is None for j in g)
-        and any(j.order == "BA" and j.flipped is None for j in g)
-    )
+    both = sum(len(_swap_units(g)) for g in groups)
     n_combined = len(judgments) - len(single)
     out: dict[str, Any] = {
         "n_rows": n_rows,
@@ -260,6 +263,8 @@ def self_preference(
     A judgment counts when exactly one of ``model_a`` / ``model_b`` matches the
     judge's family, where family is the model name up to the first ``-`` or
     ``/`` (``judge="gpt-4"`` and ``model_a="gpt-3.5"`` share family ``gpt``).
+    Each row is matched against its own judge's family; ``judge_family``
+    lists every judge family in the input, comma-separated.
     ``own_win_rate`` above the judge's overall win rate for that family on
     human labels suggests self-preference; the human comparison is only
     reported when human labels exist, together with ``excess``: the judge's
@@ -294,7 +299,7 @@ def self_preference(
         if (family(j.model_a) == fam) != (family(j.model_b) == fam):
             n_used += 1
     out: dict[str, Any] = {
-        "judge_family": family(judgments[0].judge) if judgments else None,
+        "judge_family": ", ".join(sorted({str(family(j.judge)) for j in judgments})) or None,
         "n_used": n_used,
         "own_win_rate": bootstrap(
             groups, lambda g: own(g, False), reps=reps, seed=seed
