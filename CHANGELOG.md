@@ -14,6 +14,23 @@
 - Logistic slope is nan, not 0, on a resample with one verdict class, so such resamples
   drop out of the interval; a fit that does not converge raises a warning.
 - `examples/bootstrap_coverage.py` and a test check interval coverage by simulation.
+- The slot words `first` and `second` are refused as verdicts and human labels: they name
+  a position, which is A or B depending on `order`, and were read as A and B.
+- Loader errors name the file and line; rows without a verdict, JSON lines that are not
+  objects, non-finite, fractional, boolean or negative lengths are refused with one line.
+  Numeric judge and model names are read as text. A UTF-8 byte order mark is accepted. The
+  key `label` is no longer read as the judge verdict.
+- The length slope is n/a, not 0, when every pair has the same length ratio.
+- Cohen's kappa is nan, not 1, when both raters use one label each.
+- The audit counts rows that share pair, order, judge and repeat but differ in verdict,
+  and prints a note and a warning.
+- Run mode: `human` labels in the pairs file are read like audit verdicts and checked
+  before any request; the reply parser reads `Answer: B`, `I choose B` and `A is better`
+  and no longer reads digits in longer replies or scores such as `2/10`; new
+  `--max-tokens`, `--system-file` and `--template-file` options.
+- `--reps`, `--pairs` and `--repeats` must be 1 or more.
+- The missing-pyarrow message points at the GitHub install (the PyPI package of the same
+  name is a different project). MT-Bench files are downloaded under a `.part` name.
 
 ## 0.1.0
 
