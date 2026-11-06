@@ -366,7 +366,7 @@ def test_simulated_self_preference_is_detected():
 
 def test_audit_omits_sections_without_data():
     rep = audit([j("p1", "A"), j("p2", "B")], reps=5)
-    assert set(rep) == {"n_judgments", "judges", "position", "repeat"}
+    assert set(rep) == {"n_judgments", "judges", "position", "repeat", "conflicting_copies"}
     full = audit(simulate(20, repeats=2, seed=8), reps=5)
     assert {"length", "self_preference", "agreement"} <= set(full)
     assert full["repeat"]["n_groups"] == 40

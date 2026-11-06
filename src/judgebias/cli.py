@@ -67,6 +67,13 @@ def render(report: dict[str, Any]) -> str:
         lines.append(f"  raw agreement            {_fmt(a['raw'])}")
         lines.append(f"  Cohen's kappa            {_fmt(a['kappa'])}")
     r = report["repeat"]
+    cc = report.get("conflicting_copies", {})
+    if cc.get("n_keys"):
+        lines.append(
+            f"note: {cc['n_keys']} pair/order/judge/repeat keys hold rows that differ in "
+            f"verdict ({cc['n_rows']} rows beyond the first); only the first row of each key "
+            "is used: add a repeat field"
+        )
     if r["n_groups"]:
         lines.append("repeat consistency")
         lines.append(
@@ -276,6 +283,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("judgebias: no judgments found", file=sys.stderr)
         return 2
     report = audit(judgments, ties=args.ties, reps=args.reps, seed=args.seed)
+    cc = report["conflicting_copies"]
+    if cc["n_keys"]:
+        print(
+            f"judgebias: warning: {cc['n_keys']} pair/order/judge/repeat keys hold rows "
+            f"that differ in verdict; {cc['n_rows']} rows beyond the first of each key are "
+            "left out of the position, length and repeat measures",
+            file=sys.stderr,
+        )
     if args.json:
         print(json.dumps(report, indent=2))
     else:

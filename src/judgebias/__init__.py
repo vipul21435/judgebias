@@ -4,6 +4,7 @@ from .data import Judgment, judgment_from_dict, load_jsonl, write_jsonl
 from .measures import (
     agreement,
     audit,
+    conflicting_copies,
     distinct,
     length_bias,
     position_bias,
@@ -22,6 +23,7 @@ __all__ = [
     "audit",
     "bootstrap",
     "cohen_kappa",
+    "conflicting_copies",
     "distinct",
     "judgment_from_dict",
     "length_bias",

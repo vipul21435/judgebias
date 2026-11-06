@@ -43,6 +43,22 @@ def distinct(judgments: Sequence[Judgment]) -> list[Judgment]:
     return out
 
 
+def conflicting_copies(judgments: Sequence[Judgment]) -> dict[str, int]:
+    """Count (pair, order, judge, repeat) keys whose rows differ in verdict.
+
+    :func:`distinct` keeps the first row of each key, which is right for
+    copies of one verdict. Rows that share a key but not a verdict are more
+    likely separate samples written without a ``repeat`` field; only the
+    first of them reaches the position and length measures. ``n_keys`` is the
+    number of such keys and ``n_rows`` the rows beyond the first under them.
+    """
+    rows: dict[tuple[str, str, str, int], list[str]] = defaultdict(list)
+    for j in judgments:
+        rows[(j.pair_id, j.order, j.judge, j.repeat)].append(j.verdict)
+    bad = [v for v in rows.values() if len(set(v)) > 1]
+    return {"n_keys": len(bad), "n_rows": sum(len(v) - 1 for v in bad)}
+
+
 def _flat(groups: Sequence[Sequence[Judgment]]) -> list[Judgment]:
     return [j for g in groups for j in g]
 
@@ -397,6 +413,9 @@ def repeat_consistency(judgments: Sequence[Judgment]) -> dict[str, Any]:
     ``unanimous_rate`` is the share of groups with 2+ samples whose verdicts
     all match; ``pairwise_agreement`` is the share of all sample pairs within
     a group that match.
+    ``n_conflicting_keys`` counts keys whose rows differ in verdict (see
+    :func:`conflicting_copies`); such rows are probably repeats that lack a
+    ``repeat`` field, and only the first of them is used here.
     """
     samples: dict[tuple[str, str, str], dict[int, str]] = defaultdict(dict)
     for j in judgments:
@@ -414,6 +433,7 @@ def repeat_consistency(judgments: Sequence[Judgment]) -> dict[str, Any]:
         "n_groups": len(multi),
         "unanimous_rate": _nan_if_empty(unanimous, len(multi)),
         "pairwise_agreement": _nan_if_empty(agree, total),
+        "n_conflicting_keys": conflicting_copies(judgments)["n_keys"],
     }
 
 
@@ -437,6 +457,7 @@ def audit(
         "judges": sorted({j.judge for j in judgments}),
         "position": position_bias(judgments, reps=reps, seed=seed),
         "repeat": repeat_consistency(judgments),
+        "conflicting_copies": conflicting_copies(judgments),
     }
     if any(j.len_a is not None and j.len_b is not None for j in judgments):
         out["length"] = length_bias(judgments, reps=reps, seed=seed)
