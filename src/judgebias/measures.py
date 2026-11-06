@@ -135,6 +135,11 @@ def position_bias(
     orders (``flipped`` set) are left out of those three and give
     ``combined_flip_rate`` instead: the share flagged as flipped. Copied rows
     count once (see :func:`distinct`).
+
+    ``one_order`` is ``"AB"`` or ``"BA"`` when every decided single-order row
+    was shown in that one order, and None otherwise. In that case
+    ``first_win_rate`` is also the win rate of A (or B), so it mixes position
+    with answer quality and is not a position-bias figure on its own.
     """
     n_rows = len(judgments)
     judgments = distinct(judgments)
@@ -143,12 +148,14 @@ def position_bias(
     picks = [j.picked_first for j in single]
     both = sum(len(_swap_units(g)) for g in groups)
     n_combined = len(judgments) - len(single)
+    orders = {j.order for j in single if j.picked_first is not None}
     out: dict[str, Any] = {
         "n_rows": n_rows,
         "n_judgments": len(judgments),
         "n_pairs": len(groups),
         "n_decided": sum(p is not None for p in picks),
         "n_ties": sum(p is None for p in picks),
+        "one_order": orders.pop() if len(orders) == 1 else None,
         "first_win_rate": bootstrap(groups, _first_win_rate, reps=reps, seed=seed).as_dict(),
         "n_pairs_both_orders": both,
         "flip_rate": bootstrap(groups, _flip_rate, reps=reps, seed=seed).as_dict(),

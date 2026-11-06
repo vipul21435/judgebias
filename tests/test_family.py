@@ -58,3 +58,4 @@ def test_cli_family_flag(tmp_path, capsys):
     assert "own-family win rate      1.000" in out
     with pytest.raises(SystemExit):
         main(["audit", str(path), "--family", "no-equals-sign"])
+

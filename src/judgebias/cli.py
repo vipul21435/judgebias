@@ -36,6 +36,13 @@ def render(report: dict[str, Any]) -> str:
             f"  first-position win rate  {_fmt(p['first_win_rate'])}"
             f"  (decided {p['n_decided']}, ties {p['n_ties']})"
         )
+        if p.get("one_order"):
+            first = p["one_order"][0]
+            lines.append(
+                f"  note: every row was shown in order {p['one_order']}, so this is also the "
+                f"win rate of {first} and cannot be told apart from {first} being better; "
+                "show pairs in both orders or randomise the order"
+            )
         lines.append(
             f"  flip rate under swap     {_fmt(p['flip_rate'])}"
             f"  (both orders, same judge: {p['n_pairs_both_orders']})"

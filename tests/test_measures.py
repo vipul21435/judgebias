@@ -534,3 +534,20 @@ def test_bootstrap_interval_coverage_by_simulation(n_prompts, rate):
         est = bootstrap(_by_pair(js), _first_win_rate, reps=400, seed=r)
         hits += est.low <= rate <= est.high
     assert 0.90 <= hits / runs <= 0.98
+
+
+def test_single_order_file_flags_the_first_position_rate():
+    rng = np.random.default_rng(4)
+    # A is the stronger answer and always shown first; no position effect
+    verdicts = rng.choice(["A", "B", "tie"], size=150, p=[0.6, 0.2, 0.2])
+    js = [Judgment(pair_id=f"p{i}", verdict=str(v)) for i, v in enumerate(verdicts)]
+    rep = audit(js, reps=20)
+    assert rep["position"]["one_order"] == "AB"
+    from judgebias.cli import render
+
+    text = render(rep)
+    assert "every row was shown in order AB" in text
+    both = js + [Judgment(pair_id="p0", verdict="A", order="BA")]
+    rep = audit(both, reps=20)
+    assert rep["position"]["one_order"] is None
+    assert "every row was shown" not in render(rep)
