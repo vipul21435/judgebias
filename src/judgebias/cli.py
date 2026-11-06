@@ -152,31 +152,52 @@ def _cmd_run(args: argparse.Namespace) -> int:
         timeout=args.timeout,
     )
     orders = ("AB",) if args.one_order else ("AB", "BA")
-    unparsed: list[dict[str, Any]] = []
+    counts = {"judged": 0, "unparsed": 0}
+    try:
+        out = open(args.out, "w", encoding="utf-8")  # noqa: SIM115 - closed below
+        lost = open(args.unparsed, "w", encoding="utf-8") if args.unparsed else None  # noqa: SIM115
+    except OSError as exc:
+        print(f"judgebias: {exc}", file=sys.stderr)
+        return 2
 
-    def note_unparsed(pair: Any, order: str, rep: int) -> None:
-        unparsed.append(
-            {"pair_id": pair.pair_id, "order": order, "repeat": rep, "reply": judge.last_reply}
-        )
+    def write(fh: Any, row: dict[str, Any]) -> None:
+        fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+        fh.flush()
+
+    def on_judgment(j: Any) -> None:
+        write(out, to_rows([j])[0])
+        counts["judged"] += 1
+
+    def on_unparsed(pair: Any, order: str, rep: int) -> None:
+        counts["unparsed"] += 1
+        if lost is not None:
+            row = {"pair_id": pair.pair_id, "order": order, "repeat": rep,
+                   "reply": judge.last_reply}
+            write(lost, row)
 
     try:
-        judgments = run_pairs(
+        run_pairs(
             pairs,
             judge,
             judge_name=args.judge_name or args.model,
             orders=orders,
             repeats=args.repeats,
-            on_unparsed=note_unparsed,
+            on_judgment=on_judgment,
+            on_unparsed=on_unparsed,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"judgebias: {exc}", file=sys.stderr)
+        print(f"judgebias: kept the {counts['judged']} judgments made so far in {args.out}",
+              file=sys.stderr)
         return 1
-    write_jsonl(args.out, to_rows(judgments))
-    print(f"wrote {len(judgments)} judgments from {len(pairs)} pairs to {args.out}")
-    if unparsed:
-        print(f"{len(unparsed)} replies held no readable verdict and were left out")
+    finally:
+        out.close()
+        if lost is not None:
+            lost.close()
+    print(f"wrote {counts['judged']} judgments from {len(pairs)} pairs to {args.out}")
+    if counts["unparsed"]:
+        print(f"{counts['unparsed']} replies held no readable verdict and were left out")
         if args.unparsed:
-            write_jsonl(args.unparsed, unparsed)
             print(f"wrote them to {args.unparsed}")
     return 0
 

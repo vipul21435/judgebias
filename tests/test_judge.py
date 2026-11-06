@@ -201,3 +201,29 @@ def test_cli_run_reports_errors(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("judgebias.judge.urllib_transport", boom)
     assert main(["run", str(pairs), "--out", str(tmp_path / "o"), "--model", "m"]) == 1
     assert "returned 500" in capsys.readouterr().err
+
+
+def test_cli_run_keeps_judgments_made_before_a_failure(tmp_path, capsys, monkeypatch):
+    pairs = tmp_path / "pairs.jsonl"
+    write_jsonl(
+        pairs,
+        [{"pair_id": f"p{i}", "prompt": "q", "answer_a": "a", "answer_b": "b"} for i in range(3)],
+    )
+    replies = iter(["1", "2", "1"])
+
+    def flaky(*a):
+        try:
+            return reply(next(replies))
+        except StopIteration:
+            raise OSError("connection reset") from None
+
+    monkeypatch.setattr("judgebias.judge.urllib_transport", flaky)
+    out = tmp_path / "o.jsonl"
+    assert main(["run", str(pairs), "--out", str(out), "--model", "m"]) == 1
+    err = capsys.readouterr().err
+    assert "connection reset" in err and "kept the 3 judgments" in err
+    assert [(j.pair_id, j.order) for j in load_jsonl(out)] == [
+        ("p0", "AB"), ("p0", "BA"), ("p1", "AB")
+    ]
+    assert main(["run", str(pairs), "--out", str(tmp_path / "no" / "o.jsonl"),
+                 "--model", "m"]) == 2
