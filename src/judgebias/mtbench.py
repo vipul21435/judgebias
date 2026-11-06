@@ -14,8 +14,8 @@ GPT-4 verdict on the same pair, so the agreement and self-preference measures
 apply to the GPT-4 judge against human labels. ``convert_human_pairs`` pairs
 human verdicts with each other, for a human-human baseline.
 
-Reading parquet needs ``pyarrow`` (install the ``mtbench`` extra); nothing
-else here depends on it.
+Reading parquet needs ``pyarrow`` (``pip install pyarrow``, or the
+``mtbench`` extra of the GitHub install); nothing else here depends on it.
 """
 
 from __future__ import annotations
@@ -46,10 +46,16 @@ def download(dest_dir: str | Path) -> dict[str, Path]:
 
 
 def read_parquet(path: str | Path) -> list[dict[str, Any]]:
+    """Read a parquet file into a list of row dicts (needs pyarrow)."""
     try:
         import pyarrow.parquet as pq
-    except ImportError as exc:  # pragma: no cover - depends on the environment
-        msg = "reading parquet needs pyarrow: pip install 'judgebias[mtbench]'"
+    except ImportError as exc:
+        # judgebias is installed from GitHub; a PyPI package of the same name is
+        # a different project, so the hint must not point there.
+        msg = (
+            "reading parquet needs pyarrow: pip install pyarrow, or pip install "
+            '"judgebias[mtbench] @ git+https://github.com/vipul21435/judgebias"'
+        )
         raise RuntimeError(msg) from exc
     return pq.read_table(str(path)).to_pylist()
 

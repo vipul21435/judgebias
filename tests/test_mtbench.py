@@ -238,3 +238,18 @@ def test_cli_mtbench_reports_download_and_parquet_errors(tmp_path, capsys, monke
     assert main(["mtbench", "--data-dir", str(tmp_path / "d")]) == 2
     err = capsys.readouterr().err
     assert err.startswith("judgebias: reading parquet needs pyarrow") and "Traceback" not in err
+
+
+def test_missing_pyarrow_hint_points_at_this_repository(monkeypatch):
+    import sys
+
+    from judgebias.mtbench import read_parquet
+
+    monkeypatch.setitem(sys.modules, "pyarrow", None)
+    monkeypatch.setitem(sys.modules, "pyarrow.parquet", None)
+    with pytest.raises(RuntimeError) as info:
+        read_parquet("x.parquet")
+    msg = str(info.value)
+    assert "git+https://github.com/vipul21435/judgebias" in msg
+    assert "pip install 'judgebias[mtbench]'" not in msg
+
