@@ -60,7 +60,7 @@ The last line is exact rather than lucky: a judge seen in both orders that never
 
 ### Run mode: judging pairs through an HTTP endpoint
 
-`judgebias run` sends each pair (`pair_id`, `prompt`, `answer_a`, `answer_b`, optional `model_a`, `model_b`, `human`) to any OpenAI-compatible `/chat/completions` endpoint, in both orders by default, and writes judgments ready for `audit`. The bearer token, if any, is read from the environment variable named by `--api-key-env` (default `JUDGE_API_KEY`). The judge is pluggable in Python: anything callable as `judge(prompt, first, second) -> "first" | "second" | "tie"` works with `judgebias.judge.run_pairs`.
+`judgebias run` sends each pair (`pair_id`, `prompt`, `answer_a`, `answer_b`, optional `model_a`, `model_b`, `human`) to any OpenAI-compatible `/chat/completions` endpoint, in both orders by default, and writes judgments ready for `audit`. The bearer token, if any, is read from the environment variable named by `--api-key-env` (default `JUDGE_API_KEY`). Replies that hold no readable verdict (see Limitations) are not turned into ties: the command prints how many there were and leaves them out, and `--unparsed PATH` writes each one with its pair, order and reply text. The judge is pluggable in Python: anything callable as `judge(prompt, first, second) -> "first" | "second" | "tie"` works with `judgebias.judge.run_pairs`.
 
 `examples/stub_judge_server.py` is a local stand-in server that prefers the longer answer and says "first" when the two lengths are within 20 characters. Against the 12 hand-written pairs in `examples/pairs.jsonl`:
 
@@ -151,7 +151,7 @@ What the numbers say, and no more: on this data GPT-4 agrees with a human as oft
 - The MT-Bench GPT-4 split publishes only verdicts that already combine both orders, so its first-position win rate cannot be computed from it; only the share of order-inconsistent verdicts can. The human split's first-position figures assume `model_a` was shown first.
 - Self-preference uses a name-prefix family rule, which is wrong for models whose names do not start with their vendor or family, and it cannot tell a judge's taste for its own family from real quality differences that humans missed.
 - Intervals are percentile bootstrap intervals over prompts; for very small samples or rates near 0 or 1 they under-cover. No correction for multiple comparisons is applied across the measures.
-- The run mode has been tried here against the local stub server only, not against a hosted model. It sends one request per pair, order and repeat with no retries, rate limiting or concurrency, and it reads only a bare `1`, `2`, `A`, `B`, `first`, `second` or `tie` from the reply; a reply with none of these counts as a tie.
+- The run mode has been tried here against the local stub server only, not against a hosted model. It sends one request per pair, order and repeat with no retries, rate limiting or concurrency, and its reply parser is a set of fixed patterns, not a model: it reads a reply that is only `1`, `2`, `A`, `B`, `first`, `second` or `tie`, an MT-Bench style `[[A]]` / `[[B]]` / `[[C]]` marker, or, in a longer reply, exactly one of `1`, `2`, `first`, `second`, `tie`, `Response A` and the like. A reply that names both slots or none is counted as unparsed and left out, not guessed. A judge that argues at length before naming its pick, or that refers to the answers in some other way, will give many unparsed replies; check the count before reading the audit.
 - Lengths are character counts, not tokens.
 
 ## Related tools

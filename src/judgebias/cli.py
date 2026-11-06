@@ -115,6 +115,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--repeats", type=int, default=1, help="samples per pair and order")
     r.add_argument("--temperature", type=float, default=0.0)
     r.add_argument("--timeout", type=float, default=60.0, help="seconds per request")
+    r.add_argument("--unparsed", default=None, metavar="PATH",
+                   help="write replies that held no readable verdict here (JSONL)")
 
     m = sub.add_parser("mtbench", help="convert the MT-Bench human-judgment parquet files")
     m.add_argument("--data-dir", required=True,
@@ -150,6 +152,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
         timeout=args.timeout,
     )
     orders = ("AB",) if args.one_order else ("AB", "BA")
+    unparsed: list[dict[str, Any]] = []
+
+    def note_unparsed(pair: Any, order: str, rep: int) -> None:
+        unparsed.append(
+            {"pair_id": pair.pair_id, "order": order, "repeat": rep, "reply": judge.last_reply}
+        )
+
     try:
         judgments = run_pairs(
             pairs,
@@ -157,12 +166,18 @@ def _cmd_run(args: argparse.Namespace) -> int:
             judge_name=args.judge_name or args.model,
             orders=orders,
             repeats=args.repeats,
+            on_unparsed=note_unparsed,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"judgebias: {exc}", file=sys.stderr)
         return 1
     write_jsonl(args.out, to_rows(judgments))
     print(f"wrote {len(judgments)} judgments from {len(pairs)} pairs to {args.out}")
+    if unparsed:
+        print(f"{len(unparsed)} replies held no readable verdict and were left out")
+        if args.unparsed:
+            write_jsonl(args.unparsed, unparsed)
+            print(f"wrote them to {args.unparsed}")
     return 0
 
 

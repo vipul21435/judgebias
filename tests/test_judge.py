@@ -49,11 +49,24 @@ class LongerTransport:
         ("1", "first"),
         ("Response 2 is better.", "second"),
         ("tie", "tie"),
-        ("I think A wins", "first"),
         ("b", "second"),
+        ("B.", "second"),
+        ("**Tie**", "tie"),
         ("The first one", "first"),
-        ("", "tie"),
-        ("no idea", "tie"),
+        ("Response A is better", "first"),
+        ("Assistant B", "second"),
+        ("[[A]]", "first"),
+        ("[[C]]", "tie"),
+        ("[[B]] since response 1 is short", "second"),
+        # the article "a" is not a verdict
+        ("As a judge, I pick 2", "second"),
+        ("A is worse; 2 wins", "second"),
+        ("I think A wins", "unparsed"),
+        # both slots or neither named: unparsed, not a tie
+        ("Response 1 is worse than Response 2", "unparsed"),
+        ("[[A]] or [[B]]", "unparsed"),
+        ("", "unparsed"),
+        ("no idea", "unparsed"),
     ],
 )
 def test_parse_verdict(text, expected):
@@ -146,6 +159,35 @@ def test_cli_run_uses_transport(tmp_path, capsys, monkeypatch):
     rows = load_jsonl(out)
     assert [j.verdict for j in rows] == ["B", "B", "B"]
     assert rows[0].judge == "m" and rows[0].order == "AB"
+
+
+def test_run_pairs_skips_unparsed_replies():
+    replies = iter(["1", "As a judge I cannot decide", "2", "2"])
+    judge = HttpJudge("http://h/v1", "m", transport=lambda *a: reply(next(replies)))
+    lost = []
+    pairs = [Pair("p0", "q", "x", "y"), Pair("p1", "q", "x", "y")]
+    out = run_pairs(pairs, judge, on_unparsed=lambda p, o, r: lost.append((p.pair_id, o, r)))
+    assert [(j.pair_id, j.order, j.verdict) for j in out] == [
+        ("p0", "AB", "A"), ("p1", "AB", "B"), ("p1", "BA", "A")
+    ]
+    assert lost == [("p0", "BA", 0)]
+    assert judge.last_reply == "2"
+
+
+def test_cli_run_writes_unparsed(tmp_path, capsys, monkeypatch):
+    pairs = tmp_path / "pairs.jsonl"
+    write_jsonl(pairs, [{"pair_id": "p", "prompt": "q", "answer_a": "a", "answer_b": "b"}])
+    monkeypatch.setattr("judgebias.judge.urllib_transport", lambda *a: reply("hmm"))
+    out, lost = tmp_path / "o.jsonl", tmp_path / "lost.jsonl"
+    rc = main(["run", str(pairs), "--out", str(out), "--model", "m", "--unparsed", str(lost)])
+    assert rc == 0
+    text = capsys.readouterr().out
+    assert "wrote 0 judgments" in text and "2 replies held no readable verdict" in text
+    rows = [json.loads(line) for line in lost.read_text().splitlines()]
+    assert rows == [
+        {"pair_id": "p", "order": "AB", "repeat": 0, "reply": "hmm"},
+        {"pair_id": "p", "order": "BA", "repeat": 0, "reply": "hmm"},
+    ]
 
 
 def test_cli_run_reports_errors(tmp_path, capsys, monkeypatch):

@@ -2,7 +2,8 @@
 
 A judge is any callable ``judge(prompt, first, second) -> verdict`` where
 ``verdict`` is ``"first"``, ``"second"`` or ``"tie"`` and refers to the slot
-in which the answers were shown. :class:`HttpJudge` is one such callable that
+in which the answers were shown, or ``"unparsed"`` when the judge gave no
+readable verdict. :class:`HttpJudge` is one such callable that
 talks to an OpenAI-compatible chat-completions endpoint through ``urllib``.
 ``run_pairs`` shows every pair in one or both orders, maps slot verdicts back
 to answer names and returns :class:`Judgment` records ready for ``audit``.
@@ -77,26 +78,50 @@ def load_pairs(path: str) -> list[Pair]:
     return [pair_from_dict(row) for row in iter_jsonl(path)]
 
 
-_VERDICT_RE = re.compile(r"\b(1|2|tie|first|second|a|b)\b", re.IGNORECASE)
+UNPARSED = "unparsed"
+
+_ALONE = {
+    "1": "first", "first": "first", "a": "first",
+    "2": "second", "second": "second", "b": "second",
+    "tie": "tie", "c": "tie",
+}
+_BRACKET_RE = re.compile(r"\[\[\s*(a|b|c|1|2|tie)\s*\]\]", re.IGNORECASE)
+_NAMED_RE = re.compile(
+    r"\b(?:response|answer|assistant|output|option|candidate)\s*#?\s*(a|b|1|2)\b",
+    re.IGNORECASE,
+)
+_WORD_RE = re.compile(r"\b(1|2|first|second|tie)\b", re.IGNORECASE)
 
 
 def parse_verdict(text: str) -> str:
-    """Map a judge reply to ``first``, ``second`` or ``tie``.
+    """Map a judge reply to ``first``, ``second``, ``tie`` or ``unparsed``.
 
-    Takes the first token in the reply that reads as a verdict: ``1``,
-    ``first`` or ``A`` mean the first slot, ``2``, ``second`` or ``B`` the
-    second, ``tie`` a tie. Replies with no such token count as a tie, so an
-    evasive judge shows up as ties rather than as a crash.
+    A reply that is nothing but a verdict (``1``, ``2``, ``A``, ``B``,
+    ``first``, ``second``, ``tie``, optionally in brackets or with trailing
+    punctuation) is read directly. In a longer reply the letters ``A`` and
+    ``B`` are only read inside a marker such as ``[[A]]`` or ``Response B``,
+    since the bare letter is also the English article; the digits ``1`` and
+    ``2`` and the words ``first``, ``second`` and ``tie`` are read anywhere.
+    ``[[...]]`` markers, the format the MT-Bench judge prompt asks for
+    (``[[C]]`` is a tie there, and so is a bare ``C``), take precedence when
+    present. If the reply names exactly one verdict it is
+    that verdict; if it names none, or more than one (``Response 1 is worse
+    than Response 2``), it is ``unparsed`` rather than a guess, so that a
+    chatty judge does not show up as a bias toward either slot.
     """
-    m = _VERDICT_RE.search(text)
-    if not m:
-        return "tie"
-    tok = m.group(1).lower()
-    if tok in ("1", "first", "a"):
-        return "first"
-    if tok in ("2", "second", "b"):
-        return "second"
-    return "tie"
+    bare = text.strip().strip("[]()*_`'\".,:;!? \t\n").lower()
+    for prefix in ("response ", "answer ", "assistant ", "option "):
+        if bare.startswith(prefix):
+            bare = bare[len(prefix):].strip()
+    if bare in _ALONE:
+        return _ALONE[bare]
+    brackets = {_ALONE[m.lower()] for m in _BRACKET_RE.findall(text)}
+    if brackets:
+        return brackets.pop() if len(brackets) == 1 else UNPARSED
+    named = {_ALONE[m.lower()] for m in _NAMED_RE.findall(text)}
+    words = {_ALONE[m.lower()] for m in _WORD_RE.findall(text)}
+    found = named | words
+    return found.pop() if len(found) == 1 else UNPARSED
 
 
 def urllib_transport(
@@ -132,6 +157,7 @@ class HttpJudge:
     timeout: float = 60.0
     transport: Transport | None = None
     calls: int = 0
+    last_reply: str | None = None
 
     def request_body(self, prompt: str, first: str, second: str) -> dict[str, Any]:
         user = self.template.format(prompt=prompt, first=first, second=second)
@@ -158,7 +184,8 @@ class HttpJudge:
             text = reply["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError(f"unexpected reply shape: {json.dumps(reply)[:300]}") from exc
-        return parse_verdict(str(text))
+        self.last_reply = str(text)
+        return parse_verdict(self.last_reply)
 
 
 def slot_to_name(slot_verdict: str, order: str) -> str:
@@ -180,19 +207,28 @@ def run_pairs(
     orders: Sequence[str] = ("AB", "BA"),
     repeats: int = 1,
     on_judgment: Callable[[Judgment], None] | None = None,
+    on_unparsed: Callable[[Pair, str, int], None] | None = None,
 ) -> list[Judgment]:
     """Judge every pair in each order ``repeats`` times.
 
     ``judge`` sees the answers in slot order and returns a slot verdict; the
     returned :class:`Judgment` records carry verdicts by answer name, lengths
     in characters and whatever model names and human labels the pairs had.
+    A reply the judge marks ``unparsed`` gives no judgment: it is passed to
+    ``on_unparsed(pair, order, repeat)`` instead, so it is neither counted as
+    a tie nor silently lost.
     """
     out: list[Judgment] = []
     for p in pairs:
         for order in orders:
             first, second = (p.answer_a, p.answer_b) if order == "AB" else (p.answer_b, p.answer_a)
             for rep in range(repeats):
-                verdict = slot_to_name(judge(p.prompt, first, second), order)
+                slot = judge(p.prompt, first, second)
+                if slot == UNPARSED:
+                    if on_unparsed is not None:
+                        on_unparsed(p, order, rep)
+                    continue
+                verdict = slot_to_name(slot, order)
                 j = Judgment(
                     pair_id=p.pair_id,
                     verdict=verdict,
