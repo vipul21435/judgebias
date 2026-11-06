@@ -25,6 +25,17 @@ def _fmt(est: dict[str, Any], signed: bool = False) -> str:
     return f"{v:{f}} [{est['low']:{f}}, {est['high']:{f}}] n={est['n']}"
 
 
+def _json_safe(obj: Any) -> Any:
+    """Replace nan and infinite floats with None, so the report is strict JSON."""
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    return obj
+
+
 def render(report: dict[str, Any]) -> str:
     judges = report["judges"]
     names = ", ".join(judges[:5]) + (f", ... ({len(judges)} in all)" if len(judges) > 5 else "")
@@ -136,7 +147,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="bootstrap resamples (default 1000); time grows with reps times "
                         "rows, about 90 s for 10,000 rows at the default")
     a.add_argument("--seed", type=int, default=0, help="bootstrap seed (default 0)")
-    a.add_argument("--json", action="store_true", help="print the full report as JSON")
+    a.add_argument("--json", action="store_true",
+                   help="print the full report as JSON; n/a values are null")
     a.add_argument("--judge", action="append", default=None, metavar="NAME",
                    help="audit only rows by this judge; repeat to keep several")
     a.add_argument("--family", action="append", type=_family_pair, default=None,
@@ -361,7 +373,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
     if args.json:
-        print(json.dumps(report, indent=2))
+        print(json.dumps(_json_safe(report), indent=2, allow_nan=False))
     else:
         print(render(report))
     return 0

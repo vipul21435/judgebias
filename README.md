@@ -42,7 +42,7 @@ agreement with humans (ties=keep, labelled 120)
   Cohen's kappa            0.410 [0.237, 0.581] n=60
 ```
 
-Brackets are 95 % percentile bootstrap intervals; `n` is the number of prompts resampled. `--json` prints the full report (including the confusion table), `--ties drop` removes tied rows from the agreement measures, and `--reps` and `--seed` control the bootstrap. The same file is in the repository as `examples/synthetic_judge.jsonl`.
+Brackets are 95 % percentile bootstrap intervals; `n` is the number of prompts resampled. `--json` prints the full report as strict JSON (including the confusion table; n/a values are `null`), `--ties drop` removes tied rows from the agreement measures, and `--reps` and `--seed` control the bootstrap. The same file is in the repository as `examples/synthetic_judge.jsonl`.
 
 Each input line is one judgment, for example:
 
