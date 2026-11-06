@@ -387,6 +387,14 @@ def test_logistic_fit_multi_recovers_two_coefficients():
         logistic_fit_multi(np.zeros(3), np.zeros(3))
 
 
+def test_public_api_exports():
+    import judgebias
+
+    for name in judgebias.__all__:
+        assert hasattr(judgebias, name)
+    assert "distinct" in judgebias.__all__ and "logistic_fit_multi" in judgebias.__all__
+
+
 def test_slope_given_human_separates_judge_length_pull():
     # humans follow the truth; the length-biased judge adds a pull of its own
     fair = length_bias(simulate(400, length=0.0, seed=12), reps=100)
