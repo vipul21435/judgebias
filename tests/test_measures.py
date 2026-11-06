@@ -304,3 +304,20 @@ def test_to_rows_round_trip(tmp_path):
     path = tmp_path / "r.jsonl"
     write_jsonl(path, to_rows(js))
     assert load_jsonl(path) == js
+
+
+def test_family_prefix_rule():
+    from judgebias.measures import family
+
+    assert family("gamma-70b") == "gamma"
+    assert family("org/alpha_7b:chat") == "org"
+    assert family(None) is None
+
+
+def test_render_includes_repeat_section(capsys, tmp_path):
+    path = tmp_path / "rep.jsonl"
+    assert main(["simulate", str(path), "--pairs", "10", "--repeats", "3", "--seed", "2"]) == 0
+    assert main(["audit", str(path), "--reps", "10"]) == 0
+    out = capsys.readouterr().out
+    assert "repeat consistency" in out
+    assert "unanimous groups" in out
