@@ -509,3 +509,26 @@ def test_self_preference_matches_each_row_to_its_own_judge():
     sp = self_preference(js, reps=5)
     assert sp["judge_family"] == "claude, gpt"
     assert sp["n_used"] == 2 and sp["own_win_rate"]["value"] == 1.0
+
+
+@pytest.mark.parametrize("n_prompts,rate", [(60, 0.6), (30, 0.85)])
+def test_bootstrap_interval_coverage_by_simulation(n_prompts, rate):
+    # 200 seeded datasets with a known first-position rate: the 95 % percentile
+    # interval should cover the true rate in roughly 90 to 98 % of them
+    from judgebias.measures import _by_pair, _first_win_rate
+    from judgebias.stats import bootstrap
+
+    rng = np.random.default_rng(1)
+    runs = 200
+    hits = 0
+    for r in range(runs):
+        js = []
+        for i in range(n_prompts):
+            first = rng.random() < rate
+            order = "AB" if rng.random() < 0.5 else "BA"
+            shown_first = "A" if order == "AB" else "B"
+            other = "B" if shown_first == "A" else "A"
+            js.append(j(f"p{i}", shown_first if first else other, order))
+        est = bootstrap(_by_pair(js), _first_win_rate, reps=400, seed=r)
+        hits += est.low <= rate <= est.high
+    assert 0.90 <= hits / runs <= 0.98
