@@ -217,3 +217,24 @@ def test_cli_mtbench_turn_filter(tmp_path, capsys, monkeypatch):
     assert main(argv + ["--human-prefix", "expert"]) == 0
     assert "human rows 2; judge rows 2" in capsys.readouterr().out
     assert {x.extra["human_judge"] for x in load_jsonl(judge)} == {"expert_0"}
+
+
+def test_cli_mtbench_reports_download_and_parquet_errors(tmp_path, capsys, monkeypatch):
+    import urllib.error
+
+    def offline(url, timeout):
+        raise urllib.error.URLError("name resolution failed")
+
+    monkeypatch.setattr("urllib.request.urlopen", offline)
+    assert main(["mtbench", "--data-dir", str(tmp_path / "d")]) == 2
+    assert "name resolution failed" in capsys.readouterr().err
+
+    monkeypatch.setattr("judgebias.mtbench.download", lambda d: {"human": "h", "gpt4_pair": "g"})
+
+    def no_pyarrow(path):
+        raise RuntimeError("reading parquet needs pyarrow: pip install 'judgebias[mtbench]'")
+
+    monkeypatch.setattr("judgebias.mtbench.read_parquet", no_pyarrow)
+    assert main(["mtbench", "--data-dir", str(tmp_path / "d")]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("judgebias: reading parquet needs pyarrow") and "Traceback" not in err

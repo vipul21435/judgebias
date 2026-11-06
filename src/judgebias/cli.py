@@ -205,9 +205,14 @@ def _cmd_run(args: argparse.Namespace) -> int:
 def _cmd_mtbench(args: argparse.Namespace) -> int:
     from . import mtbench
 
-    paths = mtbench.download(args.data_dir)
-    judge_rows = mtbench.read_parquet(paths["gpt4_pair"])
-    human_rows = mtbench.read_parquet(paths["human"])
+    try:
+        paths = mtbench.download(args.data_dir)
+        judge_rows = mtbench.read_parquet(paths["gpt4_pair"])
+        human_rows = mtbench.read_parquet(paths["human"])
+    except (OSError, RuntimeError, ValueError) as exc:
+        # urllib.error.URLError is an OSError; a missing pyarrow is a RuntimeError
+        print(f"judgebias: {exc}", file=sys.stderr)
+        return 2
     if args.turn is not None:
         judge_rows = [r for r in judge_rows if int(r["turn"]) == args.turn]
         human_rows = [r for r in human_rows if int(r["turn"]) == args.turn]
