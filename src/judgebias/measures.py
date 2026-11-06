@@ -9,7 +9,7 @@ pair, and repeated samples of it, are resampled together.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -274,13 +274,18 @@ def _interval(groups, statistic, reps, seed) -> tuple[float, float]:
 
 
 def self_preference(
-    judgments: Sequence[Judgment], *, reps: int = 1000, seed: int = 0
+    judgments: Sequence[Judgment],
+    *,
+    reps: int = 1000,
+    seed: int = 0,
+    families: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Win rate of answers from the judge's own family against the rest.
 
     A judgment counts when exactly one of ``model_a`` / ``model_b`` matches the
     judge's family (see :func:`family`; ``judge="gpt-4"`` and
-    ``model_a="gpt-3.5"`` share family ``gpt``).
+    ``model_a="gpt-3.5"`` share family ``gpt``). ``families`` maps judge or
+    model names to a family and takes precedence over the name rule.
     Each row is matched against its own judge's family; ``judge_family``
     lists every judge family in the input, comma-separated.
     ``own_win_rate`` above the judge's overall win rate for that family on
@@ -298,8 +303,9 @@ def self_preference(
         for j in _flat(g):
             if j.model_a is None or j.model_b is None:
                 continue
-            fam = family(j.judge)
-            a_own, b_own = family(j.model_a) == fam, family(j.model_b) == fam
+            fam = family(j.judge, families)
+            a_own = family(j.model_a, families) == fam
+            b_own = family(j.model_b, families) == fam
             if a_own == b_own:
                 continue
             label = j.human if use_human else j.verdict
@@ -313,11 +319,12 @@ def self_preference(
     for j in judgments:
         if j.model_a is None or j.model_b is None:
             continue
-        fam = family(j.judge)
-        if (family(j.model_a) == fam) != (family(j.model_b) == fam):
+        fam = family(j.judge, families)
+        if (family(j.model_a, families) == fam) != (family(j.model_b, families) == fam):
             n_used += 1
     out: dict[str, Any] = {
-        "judge_family": ", ".join(sorted({str(family(j.judge)) for j in judgments})) or None,
+        "judge_family": ", ".join(sorted({str(family(j.judge, families)) for j in judgments}))
+        or None,
         "n_used": n_used,
         "own_win_rate": bootstrap(
             groups, lambda g: own(g, False), reps=reps, seed=seed
@@ -333,12 +340,23 @@ def self_preference(
     return out
 
 
-def family(model: str | None) -> str | None:
-    """Lower-cased model name up to the first ``/``, ``-``, ``_`` or ``:``."""
+def family(model: str | None, overrides: Mapping[str, str] | None = None) -> str | None:
+    """The family of a model or judge name.
+
+    A name listed in ``overrides`` (compared case-insensitively) gets the
+    family given there. Otherwise the family is the last ``/`` component of
+    the lower-cased name, up to the first ``-``, ``_`` or ``:``, so a vendor
+    or router prefix is ignored: ``openai/gpt-4o`` and
+    ``openrouter/meta-llama/llama-3-70b`` give ``gpt`` and ``llama``.
+    """
     if model is None:
         return None
-    text = model.lower()
-    for sep in ("/", "-", "_", ":"):
+    if overrides:
+        lowered = {k.lower(): v for k, v in overrides.items()}
+        if model.lower() in lowered:
+            return lowered[model.lower()].lower()
+    text = model.lower().rsplit("/", 1)[-1]
+    for sep in ("-", "_", ":"):
         text = text.split(sep, 1)[0]
     return text
 
@@ -447,11 +465,15 @@ def audit(
     ties: str = "keep",
     reps: int = 1000,
     seed: int = 0,
+    families: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Run every measure that the data supports.
 
     Self-preference is reported only when some judgment pits the judge's own
-    family against another; it is omitted otherwise.
+    family against another. When rows name their models but none does,
+    ``self_preference_note`` lists the judge and candidate families instead,
+    so a family rule that does not fit the names is visible; ``families``
+    overrides the rule (see :func:`family`).
     """
     out: dict[str, Any] = {
         "n_judgments": len(judgments),
@@ -463,9 +485,21 @@ def audit(
     if any(j.len_a is not None and j.len_b is not None for j in judgments):
         out["length"] = length_bias(judgments, reps=reps, seed=seed)
     if any(j.model_a is not None and j.model_b is not None for j in judgments):
-        sp = self_preference(judgments, reps=reps, seed=seed)
+        sp = self_preference(judgments, reps=reps, seed=seed, families=families)
         if sp["n_used"]:
             out["self_preference"] = sp
+        else:
+            out["self_preference_note"] = {
+                "judge_families": sorted({str(family(j.judge, families)) for j in judgments}),
+                "candidate_families": sorted(
+                    {
+                        str(family(m, families))
+                        for j in judgments
+                        for m in (j.model_a, j.model_b)
+                        if m is not None
+                    }
+                ),
+            }
     if any(j.human is not None for j in judgments):
         out["agreement"] = agreement(judgments, ties=ties, reps=reps, seed=seed)
     return out

@@ -62,6 +62,15 @@ def render(report: dict[str, Any]) -> str:
         if "own_win_rate_human" in s:
             lines.append(f"  same, by human labels    {_fmt(s['own_win_rate_human'])}")
             lines.append(f"  excess                   {_fmt(s['excess'], signed=True)}")
+    if "self_preference_note" in report:
+        n = report["self_preference_note"]
+        jf = ", ".join(n["judge_families"])
+        word = "families" if len(n["judge_families"]) > 1 else "family"
+        lines.append(
+            f"self-preference: n/a, no row has exactly one answer from judge {word} {jf} "
+            f"(candidate families: {', '.join(n['candidate_families'])}); "
+            "set families with --family NAME=FAMILY"
+        )
     if "agreement" in report:
         a = report["agreement"]
         lines.append(f"agreement with humans (ties={a['ties']}, labelled {a['n_labelled']})")
@@ -95,6 +104,14 @@ def _positive(text: str) -> int:
     return value
 
 
+def _family_pair(text: str) -> tuple[str, str]:
+    """argparse type: NAME=FAMILY."""
+    name, sep, fam = text.rpartition("=")
+    if not sep or not name or not fam:
+        raise argparse.ArgumentTypeError(f"expected NAME=FAMILY, got {text!r}")
+    return name, fam
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="judgebias",
@@ -115,6 +132,10 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--json", action="store_true", help="print the full report as JSON")
     a.add_argument("--judge", action="append", default=None, metavar="NAME",
                    help="audit only rows by this judge; repeat to keep several")
+    a.add_argument("--family", action="append", type=_family_pair, default=None,
+                   metavar="NAME=FAMILY",
+                   help="put a judge or model name in a family for the self-preference "
+                        "measure, overriding the name rule; repeat for several names")
 
     s = sub.add_parser("simulate", help="write judgments from a synthetic judge with known biases")
     s.add_argument("path", help="output JSONL file")
@@ -322,7 +343,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not judgments:
         print("judgebias: no judgments found", file=sys.stderr)
         return 2
-    report = audit(judgments, ties=args.ties, reps=args.reps, seed=args.seed)
+    families = dict(args.family) if args.family else None
+    report = audit(judgments, ties=args.ties, reps=args.reps, seed=args.seed, families=families)
     cc = report["conflicting_copies"]
     if cc["n_keys"]:
         print(

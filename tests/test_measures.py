@@ -411,7 +411,7 @@ def test_family_prefix_rule():
     from judgebias.measures import family
 
     assert family("gamma-70b") == "gamma"
-    assert family("org/alpha_7b:chat") == "org"
+    assert family("org/alpha_7b:chat") == "alpha"
     assert family(None) is None
 
 
