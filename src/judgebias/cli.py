@@ -109,7 +109,8 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--ties", choices=("keep", "drop"), default="keep",
                    help="how ties enter the agreement measures (default keep)")
     a.add_argument("--reps", type=_positive, default=1000,
-                   help="bootstrap resamples (default 1000)")
+                   help="bootstrap resamples (default 1000); time grows with reps times "
+                        "rows, about 90 s for 10,000 rows at the default")
     a.add_argument("--seed", type=int, default=0, help="bootstrap seed (default 0)")
     a.add_argument("--json", action="store_true", help="print the full report as JSON")
     a.add_argument("--judge", action="append", default=None, metavar="NAME",
