@@ -28,15 +28,16 @@ def render(report: dict[str, Any]) -> str:
     lines = [f"judgments: {report['n_judgments']}  judges: {', '.join(report['judges'])}"]
     p = report["position"]
     lines.append("position bias")
-    lines.append(
-        f"  first-position win rate  {_fmt(p['first_win_rate'])}"
-        f"  (decided {p['n_decided']}, ties {p['n_ties']})"
-    )
-    lines.append(
-        f"  flip rate under swap     {_fmt(p['flip_rate'])}"
-        f"  (pairs with both orders {p['n_pairs_both_orders']})"
-    )
-    lines.append(f"  first-both among flips   {_fmt(p['first_both_rate'])}")
+    if p["n_decided"] + p["n_ties"] or not p.get("n_combined"):
+        lines.append(
+            f"  first-position win rate  {_fmt(p['first_win_rate'])}"
+            f"  (decided {p['n_decided']}, ties {p['n_ties']})"
+        )
+        lines.append(
+            f"  flip rate under swap     {_fmt(p['flip_rate'])}"
+            f"  (pairs with both orders {p['n_pairs_both_orders']})"
+        )
+        lines.append(f"  first-both among flips   {_fmt(p['first_both_rate'])}")
     if "combined_flip_rate" in p:
         lines.append(
             f"  flipped (combined-order) {_fmt(p['combined_flip_rate'])}"

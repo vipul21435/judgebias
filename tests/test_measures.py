@@ -367,6 +367,8 @@ def test_combined_order_rows_give_flip_rate_not_first_win_rate(tmp_path, capsys)
     assert pos["combined_flip_rate"]["value"] == 0.5
     assert "combined_flip_rate" not in position_bias([j("p", "A")], reps=5)
     assert main(["audit", str(path), "--reps", "10"]) == 0
-    assert "flipped (combined-order) 0.500" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "flipped (combined-order) 0.500" in out
+    assert "first-position win rate" not in out
     with pytest.raises(ValueError):
         judgment_from_dict({"pair_id": "x", "verdict": "A", "flipped": "maybe"})
