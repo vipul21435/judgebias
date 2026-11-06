@@ -4,6 +4,11 @@ A judgment is one verdict by a judge on a pair of answers to the same prompt.
 ``verdict`` is ``"A"``, ``"B"`` or ``"tie"`` and always refers to the answers as
 named in the record, not to the order in which they were shown. ``order``
 says which answer was shown first: ``"AB"`` (A first, the default) or ``"BA"``.
+
+Some datasets only publish a verdict that already combines both presentation
+orders, with a flag for pairs where the two orders disagreed. Such a row sets
+``flipped`` (True if the orders disagreed, False if they agreed); its
+``order`` then means nothing and the first-position measures skip it.
 """
 
 from __future__ import annotations
@@ -30,6 +35,7 @@ class Judgment:
     model_b: str | None = None
     human: str | None = None
     repeat: int = 0
+    flipped: bool | None = None
     extra: dict[str, Any] = field(default_factory=dict, compare=False)
 
     def __post_init__(self) -> None:
@@ -47,8 +53,11 @@ class Judgment:
 
     @property
     def picked_first(self) -> bool | None:
-        """True if the verdict picked the first-shown answer, None on tie."""
-        if self.verdict == "tie":
+        """True if the verdict picked the first-shown answer.
+
+        None on a tie and on rows whose verdict combines both orders.
+        """
+        if self.verdict == "tie" or self.flipped is not None:
             return None
         return self.verdict == self.first_shown
 
@@ -64,6 +73,7 @@ _ALIASES = {
     "model_b": ("model_b",),
     "human": ("human", "human_label", "gold"),
     "repeat": ("repeat", "sample"),
+    "flipped": ("flipped", "inconsistent"),
 }
 
 
@@ -76,6 +86,17 @@ def _norm_verdict(value: Any) -> str:
     if text in ("tie", "draw", "equal", "both", "neither", "tie (bothbad)", "tie (bothgood)"):
         return "tie"
     raise ValueError(f"cannot read verdict {value!r}")
+
+
+def _norm_flag(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in ("true", "1", "yes"):
+        return True
+    if text in ("false", "0", "no"):
+        return False
+    raise ValueError(f"cannot read flag {value!r}")
 
 
 def judgment_from_dict(row: dict[str, Any]) -> Judgment:
@@ -100,6 +121,8 @@ def judgment_from_dict(row: dict[str, Any]) -> Judgment:
         kw["human"] = _norm_verdict(kw["human"])
     if "order" in kw:
         kw["order"] = str(kw["order"]).upper()
+    if "flipped" in kw:
+        kw["flipped"] = _norm_flag(kw["flipped"])
     for side in ("a", "b"):
         if f"len_{side}" not in kw and f"answer_{side}" in row:
             kw[f"len_{side}"] = len(str(row[f"answer_{side}"]))

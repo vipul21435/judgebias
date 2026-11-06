@@ -126,9 +126,11 @@ def convert_judge(
 ) -> list[dict[str, Any]]:
     """One judgment per human verdict, carrying the GPT-4 verdict on the same pair.
 
-    ``inconsistent="tie"`` keeps order-inconsistent GPT-4 verdicts as ties and
-    marks them; ``"drop"`` leaves those pairs out. Human verdicts on pairs the
-    judge never saw are skipped.
+    Each row carries ``flipped`` (the GPT-4 verdict combines both orders and
+    the orders disagreed), so the position measure reads the judge's flip rate
+    from it. ``inconsistent="tie"`` keeps order-inconsistent verdicts as ties;
+    ``"drop"`` leaves those pairs out (and with them the flip rate). Human
+    verdicts on pairs the judge never saw are skipped.
     """
     if inconsistent not in ("tie", "drop"):
         raise ValueError("inconsistent must be 'tie' or 'drop'")
@@ -154,7 +156,7 @@ def convert_judge(
                 "model_b": j["model_b"],
                 "human": h["verdict"],
                 "human_judge": str(row["judge"]),
-                "inconsistent": j["inconsistent"],
+                "flipped": j["inconsistent"],
                 "question_id": h["question_id"],
                 "turn": h["turn"],
             }

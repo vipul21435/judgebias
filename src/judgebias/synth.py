@@ -96,4 +96,6 @@ def to_rows(judgments: list[Judgment]) -> list[dict[str, Any]]:
                 "repeat": j.repeat,
             }
         )
+        if j.flipped is not None:
+            rows[-1]["flipped"] = j.flipped
     return rows

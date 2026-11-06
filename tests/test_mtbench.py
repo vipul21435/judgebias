@@ -79,7 +79,7 @@ def test_convert_judge_pairs_with_humans_and_handles_inconsistent():
     assert len(out) == 3
     assert out[0]["verdict"] == "B" and out[0]["human"] == "B"
     assert out[1]["verdict"] == "B" and out[1]["human"] == "A"
-    assert out[2]["verdict"] == "tie" and out[2]["inconsistent"] is True
+    assert out[2]["verdict"] == "tie" and out[2]["flipped"] is True
     assert out[0]["judge"] == "gpt-4" and out[0]["human_judge"] == "expert_0"
     dropped = convert_judge(judge_rows, human_rows, inconsistent="drop")
     assert len(dropped) == 2
@@ -102,6 +102,9 @@ def test_converted_rows_load_and_audit(tmp_path):
     assert len(judgments) == 8
     agr = agreement(judgments, reps=20)
     assert agr["raw"]["value"] == pytest.approx(6 / 8)
+    pos_judge = position_bias(judgments, reps=20)
+    assert pos_judge["n_combined"] == 8 and pos_judge["n_decided"] == 0
+    assert pos_judge["combined_flip_rate"]["value"] == 0.0
     hpath = tmp_path / "h.jsonl"
     write_jsonl(hpath, convert_human(human_rows))
     pos = position_bias(load_jsonl(hpath), reps=20)

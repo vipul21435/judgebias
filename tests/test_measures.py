@@ -346,3 +346,26 @@ def test_position_and_length_count_copied_rows_once():
     assert pos["first_win_rate"]["value"] == 0.5
     assert length_bias(copied, reps=10)["n_used"] == 2
     assert length_bias(copied, reps=10)["longer_win_rate"]["value"] == 0.5
+
+
+def test_combined_order_rows_give_flip_rate_not_first_win_rate(tmp_path, capsys):
+    rows = [
+        {"pair_id": "p1", "verdict": "A", "inconsistent": False},
+        {"pair_id": "p2", "verdict": "tie", "flipped": "true"},
+        {"pair_id": "p3", "verdict": "B", "flipped": 0},
+        {"pair_id": "p4", "verdict": "tie", "flipped": True},
+    ]
+    path = tmp_path / "c.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    js = load_jsonl(path)
+    assert [x.flipped for x in js] == [False, True, False, True]
+    assert all(x.picked_first is None for x in js)
+    pos = position_bias(js, reps=50)
+    assert pos["n_combined"] == 4 and pos["n_decided"] == 0
+    assert math.isnan(pos["first_win_rate"]["value"])
+    assert pos["combined_flip_rate"]["value"] == 0.5
+    assert "combined_flip_rate" not in position_bias([j("p", "A")], reps=5)
+    assert main(["audit", str(path), "--reps", "10"]) == 0
+    assert "flipped (combined-order) 0.500" in capsys.readouterr().out
+    with pytest.raises(ValueError):
+        judgment_from_dict({"pair_id": "x", "verdict": "A", "flipped": "maybe"})

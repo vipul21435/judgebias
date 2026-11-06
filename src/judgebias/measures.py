@@ -61,13 +61,19 @@ def _first_win_rate(groups: Sequence[Sequence[Judgment]]) -> float:
     return _nan_if_empty(sum(decided), len(decided))
 
 
+def _combined_flip_rate(groups: Sequence[Sequence[Judgment]]) -> float:
+    """Share of combined-order verdicts flagged as flipped."""
+    flags = [j.flipped for j in _flat(groups) if j.flipped is not None]
+    return _nan_if_empty(sum(flags), len(flags))
+
+
 def _flip_rate(groups: Sequence[Sequence[Judgment]]) -> float:
     """Share of pairs judged in both orders whose verdict changed with the order."""
     flips = 0
     both = 0
     for g in groups:
-        ab = [j.verdict for j in g if j.order == "AB"]
-        ba = [j.verdict for j in g if j.order == "BA"]
+        ab = [j.verdict for j in g if j.order == "AB" and j.flipped is None]
+        ba = [j.verdict for j in g if j.order == "BA" and j.flipped is None]
         if not ab or not ba:
             continue
         both += 1
@@ -81,8 +87,8 @@ def _consistent_first_rate(groups: Sequence[Sequence[Judgment]]) -> float:
     first_both = 0
     flipped = 0
     for g in groups:
-        ab = [j for j in g if j.order == "AB"]
-        ba = [j for j in g if j.order == "BA"]
+        ab = [j for j in g if j.order == "AB" and j.flipped is None]
+        ba = [j for j in g if j.order == "BA" and j.flipped is None]
         if not ab or not ba or ab[0].verdict == ba[0].verdict:
             continue
         flipped += 1
@@ -101,19 +107,24 @@ def position_bias(
     in both orders: the share whose verdict changed when the order changed.
     ``first_both_rate`` is, among flipped pairs, the share where the judge
     chose the first-shown answer both times (a pure position preference) as
-    opposed to the second both times. Copied rows count once (see
-    :func:`distinct`).
+    opposed to the second both times. Rows whose verdict already combines both
+    orders (``flipped`` set) are left out of those three and give
+    ``combined_flip_rate`` instead: the share flagged as flipped. Copied rows
+    count once (see :func:`distinct`).
     """
     n_rows = len(judgments)
     judgments = distinct(judgments)
     groups = _by_pair(judgments)
-    picks = [j.picked_first for j in judgments]
+    single = [j for j in judgments if j.flipped is None]
+    picks = [j.picked_first for j in single]
     both = sum(
         1
         for g in groups
-        if any(j.order == "AB" for j in g) and any(j.order == "BA" for j in g)
+        if any(j.order == "AB" and j.flipped is None for j in g)
+        and any(j.order == "BA" and j.flipped is None for j in g)
     )
-    return {
+    n_combined = len(judgments) - len(single)
+    out: dict[str, Any] = {
         "n_rows": n_rows,
         "n_judgments": len(judgments),
         "n_pairs": len(groups),
@@ -124,7 +135,13 @@ def position_bias(
         "flip_rate": bootstrap(groups, _flip_rate, reps=reps, seed=seed).as_dict(),
         "first_both_rate": bootstrap(groups, _consistent_first_rate, reps=reps, seed=seed)
         .as_dict(),
+        "n_combined": n_combined,
     }
+    if n_combined:
+        out["combined_flip_rate"] = bootstrap(
+            groups, _combined_flip_rate, reps=reps, seed=seed
+        ).as_dict()
+    return out
 
 
 # ---------------------------------------------------------------------------

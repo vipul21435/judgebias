@@ -36,6 +36,11 @@ def render(report: dict[str, Any]) -> str:
         f"  (pairs with both orders {p['n_pairs_both_orders']})"
     )
     lines.append(f"  first-both among flips   {_fmt(p['first_both_rate'])}")
+    if "combined_flip_rate" in p:
+        lines.append(
+            f"  flipped (combined-order) {_fmt(p['combined_flip_rate'])}"
+            f"  (combined-order verdicts {p['n_combined']})"
+        )
     if "length" in report:
         ln = report["length"]
         lines.append("length bias")
