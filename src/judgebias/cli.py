@@ -118,6 +118,8 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--humans", default=None, help="write judgments by the human judges here")
     m.add_argument("--judge", default=None,
                    help="write GPT-4 judgments paired with each human label here")
+    m.add_argument("--turn", type=int, choices=(1, 2), default=None,
+                   help="keep only verdicts on this turn (default: both turns)")
     m.add_argument("--human-pairs", default=None,
                    help="write human-against-human rows (an agreement baseline) here")
     m.add_argument("--inconsistent", choices=("tie", "drop"), default="tie",
@@ -163,6 +165,9 @@ def _cmd_mtbench(args: argparse.Namespace) -> int:
     paths = mtbench.download(args.data_dir)
     judge_rows = mtbench.read_parquet(paths["gpt4_pair"])
     human_rows = mtbench.read_parquet(paths["human"])
+    if args.turn is not None:
+        judge_rows = [r for r in judge_rows if int(r["turn"]) == args.turn]
+        human_rows = [r for r in human_rows if int(r["turn"]) == args.turn]
     counts = mtbench.summary(judge_rows)
     print(
         f"human rows {len(human_rows)}; judge rows {counts['rows']}: "

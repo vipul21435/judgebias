@@ -196,3 +196,19 @@ def test_download_and_read_parquet(tmp_path, monkeypatch):
     ]
     download(tmp_path / "d")
     assert len(urls) == 2  # cached, nothing fetched again
+
+
+def test_cli_mtbench_turn_filter(tmp_path, capsys, monkeypatch):
+    data = {
+        "gpt4_pair": [row(1, "x-model", "y-model", "model_a", "gpt4_pair", turn=t) for t in (1, 2)],
+        "human": [row(1, "x-model", "y-model", "model_a", "expert_0", turn=t) for t in (1, 2)],
+    }
+    monkeypatch.setattr(
+        "judgebias.mtbench.download",
+        lambda d: {k: tmp_path / f"{k}.parquet" for k in data},
+    )
+    monkeypatch.setattr("judgebias.mtbench.read_parquet", lambda p: data[p.stem])
+    judge = tmp_path / "j.jsonl"
+    assert main(["mtbench", "--data-dir", str(tmp_path), "--judge", str(judge), "--turn", "2"]) == 0
+    assert "human rows 1; judge rows 1" in capsys.readouterr().out
+    assert [x.extra["turn"] for x in load_jsonl(judge)] == [2]
