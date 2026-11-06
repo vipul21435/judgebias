@@ -25,6 +25,24 @@ def _by_pair(judgments: Sequence[Judgment]) -> list[list[Judgment]]:
     return list(groups.values())
 
 
+def distinct(judgments: Sequence[Judgment]) -> list[Judgment]:
+    """Keep the first row of each (pair, order, judge, repeat).
+
+    A file that lists one judge verdict once per human label repeats the same
+    verdict several times; the position and length measures describe the
+    judge, so they count each verdict once. The agreement and self-preference
+    measures compare against human labels row by row and use every row.
+    """
+    seen: set[tuple[str, str, str, int]] = set()
+    out: list[Judgment] = []
+    for j in judgments:
+        key = (j.pair_id, j.order, j.judge, j.repeat)
+        if key not in seen:
+            seen.add(key)
+            out.append(j)
+    return out
+
+
 def _flat(groups: Sequence[Sequence[Judgment]]) -> list[Judgment]:
     return [j for g in groups for j in g]
 
@@ -83,8 +101,11 @@ def position_bias(
     in both orders: the share whose verdict changed when the order changed.
     ``first_both_rate`` is, among flipped pairs, the share where the judge
     chose the first-shown answer both times (a pure position preference) as
-    opposed to the second both times.
+    opposed to the second both times. Copied rows count once (see
+    :func:`distinct`).
     """
+    n_rows = len(judgments)
+    judgments = distinct(judgments)
     groups = _by_pair(judgments)
     picks = [j.picked_first for j in judgments]
     both = sum(
@@ -93,6 +114,7 @@ def position_bias(
         if any(j.order == "AB" for j in g) and any(j.order == "BA" for j in g)
     )
     return {
+        "n_rows": n_rows,
         "n_judgments": len(judgments),
         "n_pairs": len(groups),
         "n_decided": sum(p is not None for p in picks),
@@ -149,8 +171,10 @@ def length_bias(
     that went to the longer answer. ``slope`` is the coefficient of
     ``log((len_a+1)/(len_b+1))`` in a logistic fit of P(A wins); 0 means
     length does not move the verdict, positive means longer answers win more.
-    Both come with a bootstrap interval over prompts.
+    Both come with a bootstrap interval over prompts. Copied rows count once
+    (see :func:`distinct`).
     """
+    judgments = distinct(judgments)
     groups = _by_pair(judgments)
     x, y = _length_rows(judgments)
     intercept, slope = logistic_fit(x, y) if x.size >= 2 else (float("nan"), float("nan"))

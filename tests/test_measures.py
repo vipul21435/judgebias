@@ -333,3 +333,16 @@ def test_render_includes_repeat_section(capsys, tmp_path):
     out = capsys.readouterr().out
     assert "repeat consistency" in out
     assert "unanimous groups" in out
+
+
+def test_position_and_length_count_copied_rows_once():
+    from judgebias.measures import distinct
+
+    one = [j("p1", "A", len_a=50, len_b=10), j("p2", "B", len_a=50, len_b=10)]
+    copied = one + [j("p1", "A", len_a=50, len_b=10, human=h) for h in ("A", "B")]
+    assert len(distinct(copied)) == 2
+    pos = position_bias(copied, reps=10)
+    assert pos["n_rows"] == 4 and pos["n_judgments"] == 2
+    assert pos["first_win_rate"]["value"] == 0.5
+    assert length_bias(copied, reps=10)["n_used"] == 2
+    assert length_bias(copied, reps=10)["longer_win_rate"]["value"] == 0.5
