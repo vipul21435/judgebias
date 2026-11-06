@@ -83,6 +83,17 @@ def render(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _positive(text: str) -> int:
+    """argparse type: an int of 1 or more."""
+    try:
+        value = int(text)
+    except ValueError:
+        value = 0
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be a whole number of 1 or more, got {text!r}")
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="judgebias", description=__doc__)
     parser.add_argument("--version", action="version", version=f"judgebias {__version__}")
@@ -92,7 +103,8 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("path", help="JSONL file; one judgment per line")
     a.add_argument("--ties", choices=("keep", "drop"), default="keep",
                    help="how ties enter the agreement measures (default keep)")
-    a.add_argument("--reps", type=int, default=1000, help="bootstrap resamples (default 1000)")
+    a.add_argument("--reps", type=_positive, default=1000,
+                   help="bootstrap resamples (default 1000)")
     a.add_argument("--seed", type=int, default=0, help="bootstrap seed (default 0)")
     a.add_argument("--json", action="store_true", help="print the full report as JSON")
     a.add_argument("--judge", action="append", default=None, metavar="NAME",
@@ -100,14 +112,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("simulate", help="write judgments from a synthetic judge with known biases")
     s.add_argument("path", help="output JSONL file")
-    s.add_argument("--pairs", type=int, default=200, help="prompts to simulate (default 200)")
+    s.add_argument("--pairs", type=_positive, default=200, help="prompts to simulate (default 200)")
     s.add_argument("--position", type=float, default=0.0,
                    help="pull toward the first-shown answer, in score units (default 0)")
     s.add_argument("--length", type=float, default=0.0,
                    help="pull per unit of log length ratio toward the longer answer (default 0)")
     s.add_argument("--self-pref", type=float, default=0.0,
                    help="pull toward answers from the judge's own family (default 0)")
-    s.add_argument("--repeats", type=int, default=1,
+    s.add_argument("--repeats", type=_positive, default=1,
                    help="samples per pair and order (default 1)")
     s.add_argument("--seed", type=int, default=0, help="random seed (default 0)")
 
@@ -123,7 +135,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="judge name written into the judgments (default: the model name)")
     r.add_argument("--one-order", action="store_true",
                    help="show each pair only as AB instead of both orders")
-    r.add_argument("--repeats", type=int, default=1, help="samples per pair and order")
+    r.add_argument("--repeats", type=_positive, default=1, help="samples per pair and order")
     r.add_argument("--temperature", type=float, default=0.0,
                    help="sampling temperature sent in the request (default 0)")
     r.add_argument("--timeout", type=float, default=60.0, help="seconds per request")
