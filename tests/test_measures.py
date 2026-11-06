@@ -551,3 +551,37 @@ def test_single_order_file_flags_the_first_position_rate():
     rep = audit(both, reps=20)
     assert rep["position"]["one_order"] is None
     assert "every row was shown" not in render(rep)
+
+
+def test_repeat_pairwise_agreement_with_unequal_counts():
+    js = [
+        j("p1", "A", repeat=0),
+        j("p1", "A", repeat=1),
+        j("p1", "B", repeat=2),
+        j("p2", "B", repeat=0),
+        j("p2", "B", repeat=1),
+        j("p2", "B", repeat=2),
+    ]
+    # p1: 1 of 3 sample pairs agree; p2: 3 of 3
+    assert repeat_consistency(js)["pairwise_agreement"] == pytest.approx(4 / 6)
+
+
+def test_repeat_groups_are_kept_apart_by_judge():
+    js = [
+        j("p1", "A", judge="x", repeat=0),
+        j("p1", "A", judge="x", repeat=1),
+        j("p1", "A", judge="y", repeat=0),
+        j("p1", "B", judge="y", repeat=1),
+    ]
+    r = repeat_consistency(js)
+    assert r["n_groups"] == 2
+    assert r["unanimous_rate"] == 0.5
+    assert r["pairwise_agreement"] == 0.5
+
+
+def test_combined_order_rows_never_enter_swap_units():
+    # a combined-order row next to a single-order BA row of the same judge
+    js = [j("p1", "A", flipped=False), j("p1", "B", order="BA")]
+    p = position_bias(js, reps=5)
+    assert p["n_pairs_both_orders"] == 0
+    assert math.isnan(p["flip_rate"]["value"])
